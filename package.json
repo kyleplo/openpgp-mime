@@ -1,0 +1,22 @@
+{
+  "name": "openpgp-mime",
+  "version": "1.0.0",
+  "description": "",
+  "license": "LGPL-3.0-or-later",
+  "author": "kyleplo",
+  "type": "module",
+  "scripts": {
+    "test": "npx tsx --test"
+  },
+  "dependencies": {
+    "content-type": "^1.0.5",
+    "openpgp": "^6.3.0",
+    "postal-mime": "^2.7.4"
+  },
+  "devDependencies": {
+    "@types/content-type": "^1.1.9",
+    "@types/node": "^25.6.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
+  }
+}
