@@ -24,7 +24,7 @@ ${armoredMessage}`;
             verificationKeys: senderPublicKey
         }
     });
-    assert.strictEqual(email.text, "hello world" + "\n")
+    assert.strictEqual(email.text, "hello world")
     assert.ok(email?.signatures && await email.signatures[0].verified)
 });
 
@@ -49,7 +49,7 @@ ${armoredMessage}`;
     });
 
     assert.strictEqual(email.text, `hello
-world` + "\n")
+world`)
     assert.ok(email?.signatures && await email.signatures[0].verified)
 });
 
@@ -70,7 +70,7 @@ ${armoredMessage}`;
             verificationKeys: senderPublicKey
         }
     });
-    assert.strictEqual(email.text, "hello world" + "\n")
+    assert.strictEqual(email.text, "hello world")
     assert.ok(email?.signatures && email.signatures.length === 0)
 });
 
@@ -112,7 +112,7 @@ ${armoredMessage}`;
             verificationKeys: receiverPublicKey
         }
     });
-    assert.strictEqual(email.text, "hello world" + "\n");
+    assert.strictEqual(email.text, "hello world");
     if (email.signatures) {
         assert.rejects(email.signatures[0].verified);
     } else {
@@ -148,7 +148,7 @@ ${armoredMessage}`;
             verificationKeys: senderPublicKey
         }
     });
-    assert.strictEqual(email.text, "hello world" + "\n")
+    assert.strictEqual(email.text, "hello world")
     assert.ok(email?.signatures && await email.signatures[0].verified)
 });
 
@@ -187,8 +187,8 @@ ${armoredMessage}`;
             verificationKeys: senderPublicKey
         }
     });
-    assert.strictEqual(email.text, "hello world" + "\n")
-    assert.strictEqual(email.html, "<p>hello world</p>" + "\n")
+    assert.strictEqual(email.text, "hello world")
+    assert.strictEqual(email.html, "<p>hello world</p>")
     assert.ok(email?.signatures && await email.signatures[0].verified)
 });
 
@@ -244,7 +244,7 @@ ${armoredMessage2}`;
             verificationKeys: senderPublicKey
         }
     });
-    assert.strictEqual(email.text, "hello world" + "\n")
+    assert.strictEqual(email.text, "hello world")
     assert.strictEqual(email.html, "<p>hello world</p>" + "\n\n")
     assert.ok(email?.signatures && await email.signatures[0].verified && await email.signatures[1].verified)
 });
@@ -303,8 +303,8 @@ ${armoredMessage2}--baz--
         }
     });
     
-    assert.strictEqual(email.text, "hello world" + "\n")
-    assert.strictEqual(email.html, "<p>hello world</p>" + "\n")
+    assert.strictEqual(email.text, "hello world")
+    assert.strictEqual(email.html, "<p>hello world</p>")
     assert.ok(email?.signatures && await email.signatures[0].verified && await email.signatures[1].verified)
 });
 
@@ -343,8 +343,8 @@ ${armoredMessage}`;
             verificationKeys: senderPublicKey
         }
     });
-    assert.strictEqual(email.text, "hello world" + "\n")
-    assert.strictEqual(email.html, "<p>hello world</p>" + "\n")
+    assert.strictEqual(email.text, "hello world")
+    assert.strictEqual(email.html, "<p>hello world</p>")
     assert.ok(email?.signatures && await email.signatures[0].verified)
 });
 
@@ -378,7 +378,7 @@ ${splitLines(btoa(armoredMessage))}`;
             verificationKeys: senderPublicKey
         }
     });
-    assert.strictEqual(email.text, "hello world" + "\n")
+    assert.strictEqual(email.text, "hello world")
     assert.ok(email?.signatures && await email.signatures[0].verified)
 });
 

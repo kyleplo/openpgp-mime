@@ -1,16 +1,17 @@
 import PostalMime, { Email, PostalMimeOptions, RawEmail } from "postal-mime";
 import { decrypt, DecryptOptions, KeyID, readMessage, Signature, VerifyOptions } from "openpgp";
 import { isNodeSigned, mergeEmails, readAttachmentData, safeParseContentType } from "./util.js";
+import "./mimeNodeMixin.js"
 
 export class OpenPGPMime extends PostalMime {
-    #options: OpenPGPMimeOptions;
+    options: OpenPGPMimeOptions;
     #armoredMessage: Uint8Array;
     #armoredMessageLength = 0;
-    #signatures: VerificationResult[] = [];
+    signatures: VerificationResult[] = [];
 
     constructor (options?: OpenPGPMimeOptions) {
         super(options);
-        this.#options = options || {};
+        this.options = options || {};
         this.#armoredMessage = new Uint8Array();
     }
 
@@ -20,7 +21,7 @@ export class OpenPGPMime extends PostalMime {
 
     async parse (rawEmail: RawEmail): Promise<OpenPGPEmail> {
         const email: OpenPGPEmail = await super.parse(rawEmail);
-        email.signatures = this.#signatures;
+        email.signatures = this.signatures;
 
         // const contentType = email.headers.find(header => header.key === "content-type")?.value || "";
         // var contentTypeParsed = safeParseContentType(contentType);
@@ -43,7 +44,7 @@ export class OpenPGPMime extends PostalMime {
         //         const verification = await verify(Object.assign({
         //             message: message,
         //             signature: signature
-        //         }, this.#options.verifyOptions));
+        //         }, this.options.verifyOptions));
         //         console.log(verification)
         //         email.signatures = (email.signatures || []).concat(verification.signatures);
         //     }
@@ -70,63 +71,63 @@ export class OpenPGPMime extends PostalMime {
     //     super.processNodeTree();
     // }
 
-    async processLine (line: Uint8Array, isFinal: boolean): Promise<void> {
-        // @ts-expect-error currentNode is not in the type definition
-        const currentNode: MimeNode = this.currentNode;
+    // async processLine (line: Uint8Array, isFinal: boolean): Promise<void> {
+    //     // @ts-expect-error currentNode is not in the type definition
+    //     const currentNode: MimeNode = this.currentNode;
 
-        if (line.length >= 25 && line[1] === 0x2d && line[line.length - 1] === 0x2d) {
-            const lineText = new TextDecoder().decode((line[0] === 0x0a || line[0] === 0x0d) ? line.slice(1) : line);
+    //     if (line.length >= 25 && line[1] === 0x2d && line[line.length - 1] === 0x2d) {
+    //         const lineText = new TextDecoder().decode((line[0] === 0x0a || line[0] === 0x0d) ? line.slice(1) : line);
             
-            if (lineText === "-----BEGIN PGP MESSAGE-----") {
-                this.#armoredMessage = line;
-                this.#armoredMessageLength = line.length;
-                return;
-            } else if (lineText === "-----END PGP MESSAGE-----") {
-                this.#appendArmoredMessage(line);
+    //         if (lineText === "-----BEGIN PGP MESSAGE-----") {
+    //             this.#armoredMessage = line;
+    //             this.#armoredMessageLength = line.length;
+    //             return;
+    //         } else if (lineText === "-----END PGP MESSAGE-----") {
+    //             this.#appendArmoredMessage(line);
 
-                const messageString = new TextDecoder().decode(this.#armoredMessage).slice(0, this.#armoredMessageLength);
+    //             const messageString = new TextDecoder().decode(this.#armoredMessage).slice(0, this.#armoredMessageLength);
 
-                this.#armoredMessage = new Uint8Array();
-                this.#armoredMessageLength = 0;
+    //             this.#armoredMessage = new Uint8Array();
+    //             this.#armoredMessageLength = 0;
                 
-                var lines: string[];
-                if (this.#options.testNoDecrypt) {
-                    lines = messageString.split("\n");
-                } else {
-                    const message = await readMessage({ armoredMessage: messageString });
-                    const decrypted = await decrypt(Object.assign({
-                        message: message
-                    }, this.#options.decryptOptions));
-                    lines = decrypted.data.split("\n");
-                    this.#signatures = this.#signatures.concat(decrypted.signatures);
-                }
+    //             var lines: string[];
+    //             if (this.options.testNoDecrypt) {
+    //                 lines = messageString.split("\n");
+    //             } else {
+    //                 const message = await readMessage({ armoredMessage: messageString });
+    //                 const decrypted = await decrypt(Object.assign({
+    //                     message: message
+    //                 }, this.options.decryptOptions));
+    //                 lines = decrypted.data.split("\n");
+    //                 this.signatures = this.signatures.concat(decrypted.signatures);
+    //             }
 
-                if (currentNode.options?.parentMultipartType === "encrypted") {
-                    currentNode.state = "header";
-                    currentNode.headerLines.length = 0;
-                    currentNode.headerSize = 0;
-                    currentNode.headers.length = 0;
-                    currentNode.rawHeaderLines.length = 0;
-                    currentNode.contentType = {
-                        value: "text/plain",
-                        default: true
-                    }
-                }
+    //             if (currentNode.options?.parentMultipartType === "encrypted") {
+    //                 currentNode.state = "header";
+    //                 currentNode.headerLines.length = 0;
+    //                 currentNode.headerSize = 0;
+    //                 currentNode.headers.length = 0;
+    //                 currentNode.rawHeaderLines.length = 0;
+    //                 currentNode.contentType = {
+    //                     value: "text/plain",
+    //                     default: true
+    //                 }
+    //             }
 
-                for (var i = 0; i < lines.length; i++) {
-                    await this.processLine(new TextEncoder().encode(lines[i]), i === lines.length - 1 && isFinal);
-                }
-                return;
-            }
-        }
+    //             for (var i = 0; i < lines.length; i++) {
+    //                 await this.processLine(new TextEncoder().encode(lines[i]), i === lines.length - 1 && isFinal);
+    //             }
+    //             return;
+    //         }
+    //     }
 
-        if (this.#armoredMessageLength > 0) {
-            this.#appendArmoredMessage(line);
-        } else {
-            // @ts-expect-error processLine is not in the type definition
-            return super.processLine(line, isFinal);
-        }
-    }
+    //     if (this.#armoredMessageLength > 0) {
+    //         this.#appendArmoredMessage(line);
+    //     } else {
+    //         // @ts-expect-error processLine is not in the type definition
+    //         return super.processLine(line, isFinal);
+    //     }
+    // }
 
     #appendArmoredMessage (line: Uint8Array) {
         while (this.#armoredMessageLength + line.length + 1 > this.#armoredMessage.length) {
@@ -149,34 +150,6 @@ export type OpenPGPMimeOptions = PostalMimeOptions & {
 
 export type OpenPGPEmail = Email & {
     signatures?: VerificationResult[]
-}
-
-export type MimeNode = {
-    childNodes: MimeNode[],
-    contentType: {
-        value: string,
-        parsed?: {
-            value: string,
-            params: {
-                [key: string]: string
-            }
-        },
-        multipart?: string,
-        default?: boolean
-    },
-    root: boolean,
-    parentNode?: MimeNode,
-    state: string,
-    headerLines: [],
-    headerSize: number,
-    headers: [],
-    rawHeaderLines: [],
-    options: {
-        parentMultipartType?: string
-    },
-    contentTransferEncoding: {
-        value: string
-    }
 }
 
 // taken from OpenPGP.js type definitions, is not exported from there
