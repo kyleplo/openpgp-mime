@@ -4,6 +4,7 @@ import assert from "node:assert"
 import { OpenPGPMime } from "../src/OpenPGPMime.js"
 import { createMessage, encrypt } from "openpgp"
 import { receiverPrivateKey, receiverPublicKey, senderPrivateKey, senderPublicKey } from "./fixture/keys.js";
+import { splitLines } from "./fixture/splitlines.js";
 
 test("Decrypt Encrypted Message", async () => {
     const armoredMessage = await encrypt({
@@ -301,8 +302,125 @@ ${armoredMessage2}--baz--
             verificationKeys: senderPublicKey
         }
     });
-    console.log(email)
+    
     assert.strictEqual(email.text, "hello world" + "\n")
     assert.strictEqual(email.html, "<p>hello world</p>" + "\n")
     assert.ok(email?.signatures && await email.signatures[0].verified && await email.signatures[1].verified)
+});
+
+test("Decrypt Multipart Message Containing Encrypted Message And Unencrypted Message", async () => {
+    const armoredMessage = await encrypt({
+        encryptionKeys: receiverPublicKey,
+        signingKeys: senderPrivateKey,
+        message: await createMessage({
+            text: `Content-Type: text/plain
+
+hello world`
+        })
+    });
+    const eml = `Mime-Version: 1.0
+Content-Type: multipart/alternative; boundary=foo
+
+--foo
+Content-Type: text/html
+
+<p>hello world</p>
+--foo
+Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"; boundary=bar
+
+--bar
+Content-Type: application/pgp-encrypted
+
+Version: 1
+
+--bar
+Content-Type: application/octet-stream
+
+${armoredMessage}`;
+    const email = await OpenPGPMime.parse(eml, {
+        decryptOptions: {
+            decryptionKeys: receiverPrivateKey,
+            verificationKeys: senderPublicKey
+        }
+    });
+    assert.strictEqual(email.text, "hello world" + "\n")
+    assert.strictEqual(email.html, "<p>hello world</p>" + "\n")
+    assert.ok(email?.signatures && await email.signatures[0].verified)
+});
+
+test("Decrypt Base64 Encoded Multipart Message Containing Encrypted Message", async () => {
+    const armoredMessage = await encrypt({
+        encryptionKeys: receiverPublicKey,
+        signingKeys: senderPrivateKey,
+        message: await createMessage({
+            text: `Content-Type: text/plain
+
+hello world`
+        })
+    });
+    const eml = `Mime-Version: 1.0
+Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"; boundary=foo
+
+--foo
+Content-Type: application/pgp-encrypted
+Content-Transfer-Encoding: base64
+
+${splitLines(btoa("Version: 1"))}
+
+--foo
+Content-Type: application/octet-stream
+Content-Transfer-Encoding: base64
+
+${splitLines(btoa(armoredMessage))}`;
+    const email = await OpenPGPMime.parse(eml, {
+        decryptOptions: {
+            decryptionKeys: receiverPrivateKey,
+            verificationKeys: senderPublicKey
+        }
+    });
+    assert.strictEqual(email.text, "hello world" + "\n")
+    assert.ok(email?.signatures && await email.signatures[0].verified)
+});
+
+test("Decrypt Multipart Message Containing Encrypted Base64 Encoded Message", async () => {
+    const armoredMessage = await encrypt({
+        encryptionKeys: receiverPublicKey,
+        signingKeys: senderPrivateKey,
+        message: await createMessage({
+            text: `Content-Type: text/plain
+Content-Transfer-Encoding: base64
+
+${splitLines(btoa("hello world"))}`
+        })
+    });
+    const eml = `Mime-Version: 1.0
+Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"; boundary=foo
+
+--foo
+Content-Type: application/pgp-encrypted
+
+Version: 1
+
+--foo
+Content-Type: application/octet-stream
+
+${armoredMessage}`;
+    const email = await OpenPGPMime.parse(eml, {
+        decryptOptions: {
+            decryptionKeys: receiverPrivateKey,
+            verificationKeys: senderPublicKey
+        }
+    });
+    assert.strictEqual(email.text, "hello world")
+    assert.ok(email?.signatures && await email.signatures[0].verified)
+});
+
+test("Read Unencrypted Base64 Encoded Message", async () => {
+    const eml = `Mime-Version: 1.0
+Content-Type: text/plain
+Content-Transfer-Encoding: base64
+
+${splitLines(btoa("hello world"))}`;
+    const email = await OpenPGPMime.parse(eml);
+    assert.strictEqual(email.text, "hello world")
 });

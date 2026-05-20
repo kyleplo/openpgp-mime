@@ -1,5 +1,5 @@
 import PostalMime, { Email, PostalMimeOptions, RawEmail } from "postal-mime";
-import { createMessage, decrypt, DecryptOptions, KeyID, readMessage, readSignature, Signature, verify, VerifyOptions } from "openpgp";
+import { decrypt, DecryptOptions, KeyID, readMessage, Signature, VerifyOptions } from "openpgp";
 import { isNodeSigned, mergeEmails, readAttachmentData, safeParseContentType } from "./util.js";
 
 export class OpenPGPMime extends PostalMime {
@@ -22,49 +22,32 @@ export class OpenPGPMime extends PostalMime {
         const email: OpenPGPEmail = await super.parse(rawEmail);
         email.signatures = this.#signatures;
 
-        const contentType = email.headers.find(header => header.key === "content-type")?.value || "";
-        var contentTypeParsed = safeParseContentType(contentType);
+        // const contentType = email.headers.find(header => header.key === "content-type")?.value || "";
+        // var contentTypeParsed = safeParseContentType(contentType);
 
-        if (email.attachments.length >= 1 && contentTypeParsed.parameters["protocol"]) {
-            if (contentTypeParsed.type.toLowerCase() === "multipart/encrypted" && contentTypeParsed.parameters["protocol"] === "application/pgp-encrypted" && email.attachments.length === 2) {
-                const versionIdentificationAttachment = email.attachments.find(attachment => safeParseContentType(attachment.mimeType).type === "application/pgp-encrypted");
+        // if (email.attachments.length >= 1 && contentTypeParsed.parameters["protocol"]) {
+        //     if (contentTypeParsed.type.toLowerCase() === "multipart/signed" && contentTypeParsed.parameters["protocol"] === "application/pgp-signature") {
+        //         const signatureAttachment = email.attachments.find(attachment => safeParseContentType(attachment.mimeType).type === "application/pgp-signature");
 
-                if (!versionIdentificationAttachment || !readAttachmentData(versionIdentificationAttachment.content, versionIdentificationAttachment.encoding).includes("Version: 1")) {
-                    return email;
-                }
-                
-                const contentAttachment = email.attachments.find(attachment => safeParseContentType(attachment.mimeType).type === "application/octet-stream");
+        //         if (!signatureAttachment) {
+        //             return email;
+        //         }
 
-                if (!contentAttachment) {
-                    return email;
-                }
+        //         const signature = await readSignature({
+        //             armoredSignature: readAttachmentData(signatureAttachment.content, signatureAttachment.encoding)
+        //         });
 
-                const attachmentData = readAttachmentData(contentAttachment.content, contentAttachment.encoding);
-                const decryptedEmail = await OpenPGPMime.parse(attachmentData, this.#options);
-                const mergedEmail: OpenPGPEmail = mergeEmails(email, decryptedEmail);
-                return mergedEmail;
-            } else if (contentTypeParsed.type.toLowerCase() === "multipart/signed" && contentTypeParsed.parameters["protocol"] === "application/pgp-signature") {
-                const signatureAttachment = email.attachments.find(attachment => safeParseContentType(attachment.mimeType).type === "application/pgp-signature");
-
-                if (!signatureAttachment) {
-                    return email;
-                }
-
-                const signature = await readSignature({
-                    armoredSignature: readAttachmentData(signatureAttachment.content, signatureAttachment.encoding)
-                });
-
-                const message = await createMessage({
-                    text: email.html
-                });
-                const verification = await verify(Object.assign({
-                    message: message,
-                    signature: signature
-                }, this.#options.verifyOptions));
-                console.log(verification)
-                email.signatures = (email.signatures || []).concat(verification.signatures);
-            }
-        }
+        //         const message = await createMessage({
+        //             text: email.html
+        //         });
+        //         const verification = await verify(Object.assign({
+        //             message: message,
+        //             signature: signature
+        //         }, this.#options.verifyOptions));
+        //         console.log(verification)
+        //         email.signatures = (email.signatures || []).concat(verification.signatures);
+        //     }
+        // }
         return email;
     }
 
@@ -88,11 +71,8 @@ export class OpenPGPMime extends PostalMime {
     // }
 
     async processLine (line: Uint8Array, isFinal: boolean): Promise<void> {
-        // if (this.currentNode && isNodeSigned(this.currentNode, 0)) {
-        // console.log(this.currentNode.depth)
-        // console.log(this.currentNode?.contentType?.parsed?.value)
-        // console.log("> " + new TextDecoder().decode(line))
-        // }
+        // @ts-expect-error currentNode is not in the type definition
+        const currentNode: MimeNode = this.currentNode;
 
         if (line.length >= 25 && line[1] === 0x2d && line[line.length - 1] === 0x2d) {
             const lineText = new TextDecoder().decode((line[0] === 0x0a || line[0] === 0x0d) ? line.slice(1) : line);
@@ -105,25 +85,37 @@ export class OpenPGPMime extends PostalMime {
                 this.#appendArmoredMessage(line);
 
                 const messageString = new TextDecoder().decode(this.#armoredMessage).slice(0, this.#armoredMessageLength);
+
+                this.#armoredMessage = new Uint8Array();
+                this.#armoredMessageLength = 0;
+                
                 var lines: string[];
                 if (this.#options.testNoDecrypt) {
-                    lines = messageString.split("\r");
+                    lines = messageString.split("\n");
                 } else {
                     const message = await readMessage({ armoredMessage: messageString });
                     const decrypted = await decrypt(Object.assign({
                         message: message
                     }, this.#options.decryptOptions));
-                    lines = decrypted.data.split("\r");
+                    lines = decrypted.data.split("\n");
                     this.#signatures = this.#signatures.concat(decrypted.signatures);
                 }
 
-                for (var i = 0; i < lines.length; i++) {
-                    // @ts-expect-error processLine is not in the type definition
-                    await super.processLine(lines[i], i === lines.length - 1 && isFinal);
+                if (currentNode.options?.parentMultipartType === "encrypted") {
+                    currentNode.state = "header";
+                    currentNode.headerLines.length = 0;
+                    currentNode.headerSize = 0;
+                    currentNode.headers.length = 0;
+                    currentNode.rawHeaderLines.length = 0;
+                    currentNode.contentType = {
+                        value: "text/plain",
+                        default: true
+                    }
                 }
 
-                this.#armoredMessage = new Uint8Array();
-                this.#armoredMessageLength = 0;
+                for (var i = 0; i < lines.length; i++) {
+                    await this.processLine(new TextEncoder().encode(lines[i]), i === lines.length - 1 && isFinal);
+                }
                 return;
             }
         }
@@ -163,16 +155,28 @@ export type MimeNode = {
     childNodes: MimeNode[],
     contentType: {
         value: string,
-        parsed: {
+        parsed?: {
             value: string,
             params: {
                 [key: string]: string
             }
         },
-        multipart?: string
+        multipart?: string,
+        default?: boolean
     },
     root: boolean,
-    parentNode?: MimeNode
+    parentNode?: MimeNode,
+    state: string,
+    headerLines: [],
+    headerSize: number,
+    headers: [],
+    rawHeaderLines: [],
+    options: {
+        parentMultipartType?: string
+    },
+    contentTransferEncoding: {
+        value: string
+    }
 }
 
 // taken from OpenPGP.js type definitions, is not exported from there
