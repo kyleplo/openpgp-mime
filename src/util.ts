@@ -1,5 +1,6 @@
 import { parse as parseContentType, ParsedMediaType, RequestLike, ResponseLike } from "content-type"
-import { MimeNode, OpenPGPEmail } from "./OpenPGPMime.js";
+import { OpenPGPEmail } from "./OpenPGPMime.js";
+import { MimeNodeStub } from "./mimeNodeMixin.js";
 
 export function safeParseContentType (input: string | RequestLike | ResponseLike): ParsedMediaType {
     try {
@@ -79,7 +80,7 @@ export function mergeEmails (a: OpenPGPEmail, b: OpenPGPEmail): OpenPGPEmail {
     return a;
 }
 
-export function isNodeSigned (node: MimeNode, depth: number): boolean {
+export function isNodeSigned (node: MimeNodeStub, depth: number): boolean {
     switch (node?.contentType?.parsed?.value.toLowerCase()) {
         case "multipart/signed":
             return depth > 0 ? true : node.parentNode ? isNodeSigned(node.parentNode, depth + 1) : false;
@@ -88,4 +89,11 @@ export function isNodeSigned (node: MimeNode, depth: number): boolean {
         default:
             return node.parentNode ? isNodeSigned(node.parentNode, depth + 1) : false;
     }
+}
+
+export function printMimeTree (root: MimeNodeStub, sp = "") {
+    console.log(sp + root.contentType.parsed?.value + " - \"" + new TextDecoder().decode(root.content?.slice(0, 60)).replaceAll("\n", "").replaceAll("\r", "") + "\"")
+    root.childNodes.forEach(c => {
+        printMimeTree(c, sp + "  ")
+    })
 }

@@ -19,8 +19,55 @@ Object.assign(MimeNode.prototype, {
             const decrypted = await decrypt(Object.assign({
                 message: message
             }, thisMimeNode.postalMime.options.decryptOptions));
-            thisMimeNode.content = (new TextEncoder().encode(decrypted.data)).buffer;
             thisMimeNode.postalMime.signatures = thisMimeNode.postalMime.signatures.concat(decrypted.signatures);
+
+            if (thisMimeNode.options?.parentMultipartType === "encrypted") {
+                thisMimeNode.state = "header";
+                thisMimeNode.headerLines.length = 0;
+                thisMimeNode.headerSize = 0;
+                thisMimeNode.headers.length = 0;
+                thisMimeNode.rawHeaderLines.length = 0;
+                thisMimeNode.contentType = {
+                    value: "text/plain",
+                    default: true
+                }
+                thisMimeNode.contentTransferEncoding = {
+                    value: "8bit"
+                }
+            } else {
+                thisMimeNode.state = "body";
+                // @ts-expect-error
+                thisMimeNode.setupContentDecoder(thisMimeNode.contentTransferEncoding.encoding)
+            }
+
+            const encodedDecryptedContent = new TextEncoder().encode(decrypted.data);
+            var startPos = 0;
+            var endPos = 0;
+            var readPos = 0;
+            while (readPos < encodedDecryptedContent.length) {
+                const char = encodedDecryptedContent[readPos++];
+
+                if (char !== 0x0d && char !== 0x0a) {
+                    endPos = readPos;
+                }
+
+                if (char === 0x0a) {
+                    const bytes = encodedDecryptedContent.slice(startPos, endPos);
+                    // @ts-expect-error
+                    await thisMimeNode.postalMime.processLine(bytes, false);
+
+                    startPos = readPos;
+                    endPos = readPos;
+                }
+            }
+
+            const bytes = encodedDecryptedContent.slice(startPos, endPos);
+
+            // @ts-expect-error
+            await thisMimeNode.postalMime.processLine(bytes, false);
+            thisMimeNode.content = thisMimeNode.contentDecoder ? await thisMimeNode.contentDecoder.finalize() : null;
+            // @ts-expect-error
+            await thisMimeNode.finalizeChildNodes();
         }
     }
 })
@@ -49,8 +96,12 @@ export type MimeNodeStub = {
         parentMultipartType?: string
     },
     contentTransferEncoding: {
-        value: string
+        value: string,
+        encoding?: string
     },
-    content?: ArrayBuffer,
-    postalMime: OpenPGPMime
+    content?: ArrayBuffer | null,
+    postalMime: OpenPGPMime,
+    contentDecoder: {
+        finalize: () => Promise<ArrayBuffer>
+    }
 }
