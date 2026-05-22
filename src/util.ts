@@ -97,3 +97,21 @@ export function printMimeTree (root: MimeNodeStub, sp = "") {
         printMimeTree(c, sp + "  ")
     })
 }
+
+const beginPgpMessage = new Uint8Array("-----BEGIN PGP MESSAGE-----".split("").map(c => c.charCodeAt(0)));
+const endPgpMessage = new Uint8Array("-----END PGP MESSAGE-----".split("").map(c => c.charCodeAt(0)));
+
+export function isPgpArmoredMessage (content: Uint8Array): boolean {
+    if (content.length < 54 || !beginPgpMessage.every((c, i) => c === content[i])) {
+        return false;
+    }
+
+    for (var i = content.length - 1; i >= 0; i--) {
+        if (content[i] === 45) {
+            return endPgpMessage.every((c, x) => c === content[i - 24 + x]);
+        } else if (content[i] !== 9 && content[i] !== 10 && content[i] !== 13 && content[i] !== 32) {
+            return false;
+        }
+    }
+    return false;
+}

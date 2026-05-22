@@ -5,6 +5,7 @@ import { OpenPGPMime } from "../src/OpenPGPMime.js"
 import { createMessage, encrypt } from "openpgp"
 import { receiverPrivateKey, receiverPublicKey, senderPrivateKey, senderPublicKey } from "./fixture/keys.js";
 import { splitLines } from "./fixture/splitlines.js";
+import { encode, wrap } from "libqp"
 
 test("Decrypt Encrypted Message", async () => {
     const armoredMessage = await encrypt({
@@ -423,4 +424,82 @@ Content-Transfer-Encoding: base64
 ${splitLines(btoa("hello world"))}`;
     const email = await OpenPGPMime.parse(eml);
     assert.strictEqual(email.text, "hello world")
+});
+
+test("Decrypt Quoted-Printable Multipart Message Containing Encrypted Message", async () => {
+    const armoredMessage = await encrypt({
+        encryptionKeys: receiverPublicKey,
+        signingKeys: senderPrivateKey,
+        message: await createMessage({
+            text: `Content-Type: text/plain; charset=iso-8859-1
+Content-Transfer-Encoding: quoted-printable
+
+=A1hola mundo!`
+        })
+    });
+    const eml = `Mime-Version: 1.0
+Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"; boundary=foo
+
+--foo
+Content-Type: application/pgp-encrypted; charset=iso-8859-1
+Content-Transfer-Encoding: quoted-printable
+
+V=65rsion: 1
+
+--foo
+Content-Type: application/octet-stream; charset=iso-8859-1
+Content-Transfer-Encoding: quoted-printable
+
+${wrap(encode(armoredMessage))}`;
+    const email = await OpenPGPMime.parse(eml, {
+        decryptOptions: {
+            decryptionKeys: receiverPrivateKey,
+            verificationKeys: senderPublicKey
+        }
+    });
+    assert.strictEqual(email.text, "¡hola mundo!\n")
+    assert.ok(email?.signatures && await email.signatures[0].verified)
+});
+
+test("Decrypt Multipart Message Containing Encrypted Quoted-Printable Message", async () => {
+    const armoredMessage = await encrypt({
+        encryptionKeys: receiverPublicKey,
+        signingKeys: senderPrivateKey,
+        message: await createMessage({
+            text: `Content-Type: text/plain; charset=iso-8859-1
+Content-Transfer-Encoding: quoted-printable
+
+=A1hola mundo!`
+        })
+    });
+    const eml = `Mime-Version: 1.0
+Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"; boundary=foo
+
+--foo
+Content-Type: application/pgp-encrypted
+
+Version: 1
+
+--foo
+Content-Type: application/octet-stream
+
+${armoredMessage}`;
+    const email = await OpenPGPMime.parse(eml, {
+        decryptOptions: {
+            decryptionKeys: receiverPrivateKey,
+            verificationKeys: senderPublicKey
+        }
+    });
+    assert.strictEqual(email.text, "¡hola mundo!\n")
+    assert.ok(email?.signatures && await email.signatures[0].verified)
+});
+
+test("Read Unencrypted Quoted-Printable Message", async () => {
+    const eml = `Mime-Version: 1.0
+Content-Type: text/plain; charset=iso-8859-1
+Content-Transfer-Encoding: quoted-printable
+
+=A1hola mundo!`;
+    const email = await OpenPGPMime.parse(eml);
+    assert.strictEqual(email.text, "¡hola mundo!\n")
 });

@@ -2,6 +2,7 @@ import { readMessage, decrypt } from "openpgp";
 // @ts-expect-error MimeNode has no type definitions
 import MimeNode from "../node_modules/postal-mime/src/mime-node.js"
 import { OpenPGPMime } from "./OpenPGPMime.js";
+import { isPgpArmoredMessage } from "./util.js";
 
 const mimeNodeFinalize = MimeNode.prototype.finalize;
 Object.assign(MimeNode.prototype, {
@@ -9,12 +10,12 @@ Object.assign(MimeNode.prototype, {
         const thisMimeNode: MimeNodeStub = this as unknown as MimeNodeStub;
         await mimeNodeFinalize.call(thisMimeNode);
 
-        if (!thisMimeNode.content) {
+        if (!thisMimeNode.content || !(thisMimeNode.postalMime instanceof OpenPGPMime)) {
             return;
         }
         const content = new Uint8Array(thisMimeNode.content);
 
-        if ("-----BEGIN PGP MESSAGE-----".split("").every((c, i) => c.charCodeAt(0) === content[i])) {
+        if (isPgpArmoredMessage(content)) {
             const message = await readMessage({ armoredMessage: new TextDecoder().decode(content) });
             const decrypted = await decrypt(Object.assign({
                 message: message
