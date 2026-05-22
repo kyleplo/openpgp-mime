@@ -18,6 +18,9 @@ export class OpenPGPMime extends PostalMime {
     async parse (rawEmail: RawEmail): Promise<OpenPGPEmail> {
         const email: OpenPGPEmail = await super.parse(rawEmail);
         email.signatures = this.signatures;
+        if (!this.options.keepPgpAttachments) {
+            email.attachments = email.attachments.filter(attachment => attachment.mimeType !== "application/pgp-encrypted")
+        }
         // // @ts-expect-error
         //printMimeTree(this.root);
 
@@ -54,6 +57,7 @@ export class OpenPGPMime extends PostalMime {
 export type OpenPGPMimeOptions = PostalMimeOptions & {
     decryptOptions?: Omit<DecryptOptions, "message">
     verifyOptions?: Omit<Omit<VerifyOptions, "signature">, "message">
+    keepPgpAttachments?: boolean
 }
 
 export type OpenPGPEmail = Email & {

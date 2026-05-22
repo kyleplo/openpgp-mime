@@ -503,3 +503,36 @@ Content-Transfer-Encoding: quoted-printable
     const email = await OpenPGPMime.parse(eml);
     assert.strictEqual(email.text, "¡hola mundo!\n")
 });
+
+test("Decrypt Multipart Message Containing Encrypted Attachment", async () => {
+    const armoredMessage = await encrypt({
+        encryptionKeys: receiverPublicKey,
+        signingKeys: senderPrivateKey,
+        message: await createMessage({
+            text: `Content-Type: image/png
+
+not actually an image but whatever`
+        })
+    });
+    const eml = `Mime-Version: 1.0
+Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"; boundary=foo
+
+--foo
+Content-Type: application/pgp-encrypted
+
+Version: 1
+
+--foo
+Content-Type: application/octet-stream
+
+${armoredMessage}`;
+    const email = await OpenPGPMime.parse(eml, {
+        decryptOptions: {
+            decryptionKeys: receiverPrivateKey,
+            verificationKeys: senderPublicKey
+        },
+        attachmentEncoding: "utf8"
+    });
+    assert.strictEqual(email.attachments[0].content, "not actually an image but whatever\n")
+    assert.ok(email?.signatures && await email.signatures[0].verified)
+});
