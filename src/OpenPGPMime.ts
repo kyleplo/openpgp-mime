@@ -30,41 +30,25 @@ export class OpenPGPMime extends PostalMime {
         if (!this.options.keepPgpAttachments) {
             email.attachments = email.attachments.filter(attachment => attachment.mimeType !== "application/pgp-encrypted" && attachment.mimeType !== "application/pgp-signature")
         }
-        // // @ts-expect-error
-        //printMimeTree(this.root);
 
-        // const contentType = email.headers.find(header => header.key === "content-type")?.value || "";
-        // var contentTypeParsed = safeParseContentType(contentType);
-
-        // if (email.attachments.length >= 1 && contentTypeParsed.parameters["protocol"]) {
-        //     if (contentTypeParsed.type.toLowerCase() === "multipart/signed" && contentTypeParsed.parameters["protocol"] === "application/pgp-signature") {
-        //         const signatureAttachment = email.attachments.find(attachment => safeParseContentType(attachment.mimeType).type === "application/pgp-signature");
-
-        //         if (!signatureAttachment) {
-        //             return email;
-        //         }
-
-        //         const signature = await readSignature({
-        //             armoredSignature: readAttachmentData(signatureAttachment.content, signatureAttachment.encoding)
-        //         });
-
-        //         const message = await createMessage({
-        //             text: email.html
-        //         });
-        //         const verification = await verify(Object.assign({
-        //             message: message,
-        //             signature: signature
-        //         }, this.options.verifyOptions));
-        //         console.log(verification)
-        //         email.signatures = (email.signatures || []).concat(verification.signatures);
-        //     }
-        // }
         return email;
     }
 
     async processLine (line: Uint8Array, final: boolean): Promise<void> {
-        const currentNode = this.currentNode as MimeNode;
-        return super.processLine(line, final);
+        await super.processLine(line, final);
+
+        var parent = this.currentNode;
+        while (parent.parentNode) {
+            parent = parent.parentNode;
+
+            if (parent.contentType.parsed?.value === "multipart/signed" && parent.contentType.parsed?.params?.protocol === "application/pgp-signature" && parent.childNodes.length === 1) {
+                if (parent.signedContent) {
+                    parent.signedContent.push(line);
+                } else {
+                    parent.signedContent = [];
+                }
+            }
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-import { readMessage, decrypt } from "openpgp";
+import { readMessage, decrypt, verify, createMessage, readSignature } from "openpgp";
 // @ts-expect-error
 import MimeNodeStub from "../node_modules/postal-mime/src/mime-node.js"
 import { OpenPGPMime } from "./OpenPGPMime.js";
@@ -19,15 +19,6 @@ Object.assign(MimeNodeStub.prototype, {
             return;
         }
         const content = new Uint8Array(thisMimeNode.content);
-
-        var parent = thisMimeNode;
-        while (parent.parentNode) {
-            parent = parent.parentNode;
-
-            if (parent.contentType.parsed?.value === "multipart/signed" && parent.contentType.parsed?.params?.protocol === "application/pgp-signature") {
-                console.log("parent is pgp signed " + thisMimeNode.contentType.parsed?.value + " " + thisMimeNode.depth)
-            }
-        }
 
         if (isPgpArmoredMessage(content)) {
             const message = await readMessage({ armoredMessage: new TextDecoder().decode(content) });
@@ -79,8 +70,20 @@ Object.assign(MimeNodeStub.prototype, {
             await thisMimeNode.postalMime.processLine(bytes, false);
             thisMimeNode.content = thisMimeNode.contentDecoder ? await thisMimeNode.contentDecoder.finalize() : null;
             await thisMimeNode.finalizeChildNodes();
-        } else if (isPgpArmoredSignature(content)) {
-            console.log("found signature")
+        } else if (isPgpArmoredSignature(content) && thisMimeNode.parentNode?.signedContent) {
+            const message = await createMessage({
+                text: thisMimeNode.parentNode.signedContent.map(t => new TextDecoder().decode(t)).join("\r\n")
+            });
+            
+            const signature = await readSignature({
+                armoredSignature: new TextDecoder().decode(content)
+            });
+            
+            const verification = await verify(Object.assign({
+                message: message,
+                signature: signature
+            }, thisMimeNode.postalMime.options.verifyOptions));
+            thisMimeNode.postalMime.signatures = thisMimeNode.postalMime.signatures.concat(verification.signatures);
         }
     }
 })
@@ -121,6 +124,7 @@ declare class MimeNode extends MimeNodeStub {
     }
     depth: number
     finalize (): Promise<void>
+    signedContent?: Uint8Array[]
 }
 
 export { MimeNode };

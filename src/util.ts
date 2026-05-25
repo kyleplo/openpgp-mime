@@ -1,44 +1,6 @@
-import { parse as parseContentType, ParsedMediaType, RequestLike, ResponseLike } from "content-type"
-import { OpenPGPEmail } from "./OpenPGPMime.js";
-import { MimeNodeStub } from "./mimeNodeMixin.js";
+import { MimeNode } from "./mimeNodeMixin.js";
 
-export function safeParseContentType (input: string | RequestLike | ResponseLike): ParsedMediaType {
-    try {
-        return parseContentType(input);
-    } catch {
-        return {
-            type: "",
-            parameters: {}
-        };
-    }
-}
-
-export function readAttachmentData (attachmentData: string | ArrayBuffer | Uint8Array<ArrayBufferLike>, encoding = "utf8"): string {
-    var data: string;
-    if (attachmentData instanceof ArrayBuffer || attachmentData instanceof Uint8Array) {
-        data = new TextDecoder().decode(attachmentData);
-    } else {
-        data = attachmentData;
-    }
-
-    if (encoding === "base64") {
-        data = atob(data);
-    }
-    return data;
-}
-
-export function isNodeSigned (node: MimeNodeStub, depth: number): boolean {
-    switch (node?.contentType?.parsed?.value.toLowerCase()) {
-        case "multipart/signed":
-            return depth > 0 ? true : node.parentNode ? isNodeSigned(node.parentNode, depth + 1) : false;
-        case "application/pgp-signature":
-            return false;
-        default:
-            return node.parentNode ? isNodeSigned(node.parentNode, depth + 1) : false;
-    }
-}
-
-export function printMimeTree (root: MimeNodeStub, sp = "") {
+export function printMimeTree (root: MimeNode, sp = "") {
     console.log(sp + root.contentType.parsed?.value + " - \"" + new TextDecoder().decode(root.content?.slice(0, 60)).replaceAll("\n", "").replaceAll("\r", "") + "\"")
     root.childNodes.forEach(c => {
         printMimeTree(c, sp + "  ")
