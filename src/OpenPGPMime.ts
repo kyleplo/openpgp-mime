@@ -34,12 +34,16 @@ export class OpenPGPMime extends PostalMime {
         return email;
     }
 
-    async processLine (line: Uint8Array, final: boolean): Promise<void> {
+    async processLine (line: Uint8Array, final: boolean, decryptedDepth = 0): Promise<void> {
         await super.processLine(line, final);
 
         var parent = this.currentNode;
         while (parent.parentNode) {
             parent = parent.parentNode;
+
+            if (parent.depth < decryptedDepth) {
+                return;
+            }
 
             if (parent.contentType.parsed?.value === "multipart/signed" && parent.contentType.parsed?.params?.protocol === "application/pgp-signature" && parent.childNodes.length === 1) {
                 if (parent.signedContent) {

@@ -58,7 +58,7 @@ Object.assign(MimeNodeStub.prototype, {
 
                 if (char === 0x0a) {
                     const bytes = encodedDecryptedContent.slice(startPos, endPos);
-                    await thisMimeNode.postalMime.processLine(bytes, false);
+                    await thisMimeNode.postalMime.processLine(bytes, false, thisMimeNode.depth);
 
                     startPos = readPos;
                     endPos = readPos;
@@ -66,17 +66,18 @@ Object.assign(MimeNodeStub.prototype, {
             }
 
             const bytes = encodedDecryptedContent.slice(startPos, endPos);
-
-            await thisMimeNode.postalMime.processLine(bytes, false);
+            await thisMimeNode.postalMime.processLine(bytes, false, thisMimeNode.depth);
             thisMimeNode.content = thisMimeNode.contentDecoder ? await thisMimeNode.contentDecoder.finalize() : null;
             await thisMimeNode.finalizeChildNodes();
         } else if (isPgpArmoredSignature(content) && thisMimeNode.parentNode?.signedContent) {
+            const messageText = thisMimeNode.parentNode.signedContent.map(t => new TextDecoder().decode(t)).join("\r\n");
             const message = await createMessage({
-                text: thisMimeNode.parentNode.signedContent.map(t => new TextDecoder().decode(t)).join("\r\n")
+                text: messageText
             });
             
+            const armoredSignature = new TextDecoder().decode(content);
             const signature = await readSignature({
-                armoredSignature: new TextDecoder().decode(content)
+                armoredSignature: armoredSignature
             });
             
             const verification = await verify(Object.assign({
