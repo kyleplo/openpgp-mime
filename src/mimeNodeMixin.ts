@@ -1,19 +1,33 @@
 import { readMessage, decrypt } from "openpgp";
-// @ts-expect-error MimeNode has no type definitions
-import MimeNode from "../node_modules/postal-mime/src/mime-node.js"
+// @ts-expect-error
+import MimeNodeStub from "../node_modules/postal-mime/src/mime-node.js"
 import { OpenPGPMime } from "./OpenPGPMime.js";
-import { isPgpArmoredMessage } from "./util.js";
+import { isPgpArmoredMessage, isPgpArmoredSignature } from "./util.js";
 
-const mimeNodeFinalize = MimeNode.prototype.finalize;
-Object.assign(MimeNode.prototype, {
+const mimeNodeFinalize = MimeNodeStub.prototype.finalize;
+Object.assign(MimeNodeStub.prototype, {
     finalize: async function () {
-        const thisMimeNode: MimeNodeStub = this as unknown as MimeNodeStub;
+        const thisMimeNode: MimeNode = this as unknown as MimeNode;
+
+        if (thisMimeNode.state === "finished") {
+            return;
+        }
+
         await mimeNodeFinalize.call(thisMimeNode);
 
         if (!thisMimeNode.content || !(thisMimeNode.postalMime instanceof OpenPGPMime)) {
             return;
         }
         const content = new Uint8Array(thisMimeNode.content);
+
+        var parent = thisMimeNode;
+        while (parent.parentNode) {
+            parent = parent.parentNode;
+
+            if (parent.contentType.parsed?.value === "multipart/signed" && parent.contentType.parsed?.params?.protocol === "application/pgp-signature") {
+                console.log("parent is pgp signed " + thisMimeNode.contentType.parsed?.value + " " + thisMimeNode.depth)
+            }
+        }
 
         if (isPgpArmoredMessage(content)) {
             const message = await readMessage({ armoredMessage: new TextDecoder().decode(content) });
@@ -37,8 +51,7 @@ Object.assign(MimeNode.prototype, {
                 }
             } else {
                 thisMimeNode.state = "body";
-                // @ts-expect-error
-                thisMimeNode.setupContentDecoder(thisMimeNode.contentTransferEncoding.encoding)
+                thisMimeNode.setupContentDecoder(thisMimeNode.contentTransferEncoding.encoding as string)
             }
 
             const encodedDecryptedContent = new TextEncoder().encode(decrypted.data);
@@ -54,7 +67,6 @@ Object.assign(MimeNode.prototype, {
 
                 if (char === 0x0a) {
                     const bytes = encodedDecryptedContent.slice(startPos, endPos);
-                    // @ts-expect-error
                     await thisMimeNode.postalMime.processLine(bytes, false);
 
                     startPos = readPos;
@@ -64,17 +76,19 @@ Object.assign(MimeNode.prototype, {
 
             const bytes = encodedDecryptedContent.slice(startPos, endPos);
 
-            // @ts-expect-error
             await thisMimeNode.postalMime.processLine(bytes, false);
             thisMimeNode.content = thisMimeNode.contentDecoder ? await thisMimeNode.contentDecoder.finalize() : null;
-            // @ts-expect-error
             await thisMimeNode.finalizeChildNodes();
+        } else if (isPgpArmoredSignature(content)) {
+            console.log("found signature")
         }
     }
 })
 
-export type MimeNodeStub = {
-    childNodes: MimeNode[],
+declare class MimeNode extends MimeNodeStub {
+    finalizeChildNodes(): Promise<void>
+    setupContentDecoder(encoding: string): void
+    childNodes: MimeNodeStub[]
     contentType: {
         value: string,
         parsed?: {
@@ -85,24 +99,28 @@ export type MimeNodeStub = {
         },
         multipart?: string,
         default?: boolean
-    },
-    root: boolean,
-    parentNode?: MimeNode,
-    state: string,
-    headerLines: [],
-    headerSize: number,
-    headers: [],
-    rawHeaderLines: [],
+    }
+    root: boolean
+    parentNode?: MimeNode
+    state: string
+    headerLines: []
+    headerSize: number
+    headers: []
+    rawHeaderLines: []
     options: {
         parentMultipartType?: string
-    },
+    }
     contentTransferEncoding: {
         value: string,
         encoding?: string
-    },
-    content?: ArrayBuffer | null,
-    postalMime: OpenPGPMime,
-    contentDecoder: {
-        finalize: () => Promise<ArrayBuffer>
     }
+    content?: ArrayBuffer | null
+    postalMime: OpenPGPMime
+    contentDecoder: {
+        finalize (): Promise<ArrayBuffer>
+    }
+    depth: number
+    finalize (): Promise<void>
 }
+
+export { MimeNode };

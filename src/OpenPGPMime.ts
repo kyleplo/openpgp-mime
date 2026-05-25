@@ -1,6 +1,15 @@
-import PostalMime, { Email, PostalMimeOptions, RawEmail } from "postal-mime";
+import { PostalMime } from "./PostalMime.js"
+import { Email, PostalMimeOptions, RawEmail } from "postal-mime";
 import { DecryptOptions, KeyID, Signature, VerifyOptions } from "openpgp";
 import "./mimeNodeMixin.js"
+import { MimeNode } from "./mimeNodeMixin.js";
+
+declare module "./PostalMime.js" {
+    interface PostalMime {
+        currentNode: MimeNode
+        processLine (line: Uint8Array, final: boolean): Promise<void>
+    }
+}
 
 export class OpenPGPMime extends PostalMime {
     options: OpenPGPMimeOptions;
@@ -19,7 +28,7 @@ export class OpenPGPMime extends PostalMime {
         const email: OpenPGPEmail = await super.parse(rawEmail);
         email.signatures = this.signatures;
         if (!this.options.keepPgpAttachments) {
-            email.attachments = email.attachments.filter(attachment => attachment.mimeType !== "application/pgp-encrypted")
+            email.attachments = email.attachments.filter(attachment => attachment.mimeType !== "application/pgp-encrypted" && attachment.mimeType !== "application/pgp-signature")
         }
         // // @ts-expect-error
         //printMimeTree(this.root);
@@ -51,6 +60,11 @@ export class OpenPGPMime extends PostalMime {
         //     }
         // }
         return email;
+    }
+
+    async processLine (line: Uint8Array, final: boolean): Promise<void> {
+        const currentNode = this.currentNode as MimeNode;
+        return super.processLine(line, final);
     }
 }
 
