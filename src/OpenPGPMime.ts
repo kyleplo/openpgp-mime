@@ -1,6 +1,6 @@
 import { PostalMime } from "./PostalMime.js"
 import { Email, PostalMimeOptions, RawEmail } from "postal-mime";
-import { DecryptOptions, KeyID, Signature, VerifyOptions } from "openpgp";
+import { DecryptOptions, KeyID, PublicKey, Signature, VerifyOptions } from "openpgp";
 import "./mimeNodeMixin.js"
 import { MimeNode } from "./mimeNodeMixin.js";
 
@@ -14,6 +14,7 @@ declare module "./PostalMime.js" {
 export class OpenPGPMime extends PostalMime {
     options: OpenPGPMimeOptions;
     signatures: VerificationResult[] = [];
+    keys: PublicKey[] = [];
 
     constructor (options?: OpenPGPMimeOptions) {
         super(options);
@@ -27,8 +28,10 @@ export class OpenPGPMime extends PostalMime {
     async parse (rawEmail: RawEmail): Promise<OpenPGPEmail> {
         const email: OpenPGPEmail = await super.parse(rawEmail);
         email.signatures = this.signatures;
+        email.keys = this.keys;
+
         if (!this.options.keepPgpAttachments) {
-            email.attachments = email.attachments.filter(attachment => attachment.mimeType !== "application/pgp-encrypted" && attachment.mimeType !== "application/pgp-signature")
+            email.attachments = email.attachments.filter(attachment => attachment.mimeType !== "application/pgp-encrypted" && attachment.mimeType !== "application/pgp-signature" && attachment.mimeType !== "application/pgp-keys")
         }
 
         return email;
@@ -60,10 +63,12 @@ export type OpenPGPMimeOptions = PostalMimeOptions & {
     decryptOptions?: Omit<DecryptOptions, "message">
     verifyOptions?: Omit<Omit<VerifyOptions, "signature">, "message">
     keepPgpAttachments?: boolean
+    preventUnencapsulatedMessages?: boolean
 }
 
 export type OpenPGPEmail = Email & {
-    signatures?: VerificationResult[]
+    signatures?: VerificationResult[],
+    keys?: PublicKey[]
 }
 
 // taken from OpenPGP.js type definitions, is not exported from there

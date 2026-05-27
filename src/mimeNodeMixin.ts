@@ -1,8 +1,8 @@
-import { readMessage, decrypt, verify, createMessage, readSignature } from "openpgp";
+import { readMessage, decrypt, verify, createMessage, readSignature, readKey } from "openpgp";
 // @ts-expect-error
 import MimeNodeStub from "../node_modules/postal-mime/src/mime-node.js"
 import { OpenPGPMime } from "./OpenPGPMime.js";
-import { isPgpArmoredMessage, isPgpArmoredSignature } from "./util.js";
+import { isPgpArmoredMessage, isPgpArmoredSignature, isPgpPublicKeyBlock } from "./util.js";
 
 const mimeNodeFinalize = MimeNodeStub.prototype.finalize;
 Object.assign(MimeNodeStub.prototype, {
@@ -20,7 +20,8 @@ Object.assign(MimeNodeStub.prototype, {
         }
         const content = new Uint8Array(thisMimeNode.content);
 
-        if (isPgpArmoredMessage(content)) {
+        if (isPgpArmoredMessage(content) && (!thisMimeNode.postalMime.options.preventUnencapsulatedMessages || thisMimeNode.contentType.parsed?.value === "application/octet-stream")) {
+
             const message = await readMessage({ armoredMessage: new TextDecoder().decode(content) });
             const decrypted = await decrypt(Object.assign({
                 message: message
@@ -67,9 +68,12 @@ Object.assign(MimeNodeStub.prototype, {
 
             const bytes = encodedDecryptedContent.slice(startPos, endPos);
             await thisMimeNode.postalMime.processLine(bytes, false, thisMimeNode.depth);
-            thisMimeNode.content = thisMimeNode.contentDecoder ? await thisMimeNode.contentDecoder.finalize() : null;
-            await thisMimeNode.finalizeChildNodes();
-        } else if (isPgpArmoredSignature(content) && thisMimeNode.parentNode?.signedContent) {
+            if (thisMimeNode.state === "finished") {
+                await thisMimeNode.finalizeChildNodes();
+            } else {
+                await thisMimeNode.finalize();
+            }
+        } else if (isPgpArmoredSignature(content) && thisMimeNode.parentNode?.signedContent && thisMimeNode.contentType.parsed?.value === "application/pgp-signature") {
             const messageText = thisMimeNode.parentNode.signedContent.map(t => new TextDecoder().decode(t)).join("\r\n");
             const message = await createMessage({
                 text: messageText
@@ -85,6 +89,14 @@ Object.assign(MimeNodeStub.prototype, {
                 signature: signature
             }, thisMimeNode.postalMime.options.verifyOptions));
             thisMimeNode.postalMime.signatures = thisMimeNode.postalMime.signatures.concat(verification.signatures);
+        } else if (isPgpPublicKeyBlock(content) && thisMimeNode.contentType.parsed?.value === "application/pgp-keys") {
+            try {
+                const key = await readKey({
+                    armoredKey: new TextDecoder().decode(content)
+                });
+
+                thisMimeNode.postalMime.keys.push(key);
+            } catch {}
         }
     }
 })

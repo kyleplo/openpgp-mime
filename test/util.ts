@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert"
-import { isPgpArmoredMessage, isPgpArmoredSignature } from "../src/util.js";
+import { isPgpArmoredMessage, isPgpArmoredSignature, isPgpPublicKeyBlock } from "../src/util.js";
 
 test("isPgpArmoredMessage Basic", () => {
     const message = new TextEncoder().encode(`\
@@ -39,4 +39,12 @@ test("isPgpArmoredSignature Basic", () => {
 woergnwerkjgnwkjrg
 -----END PGP SIGNATURE-----`);    
     assert.ok(isPgpArmoredSignature(signature));
+});
+
+test("isPgpPublicKeyBlock Basic", () => {
+    const signature = new TextEncoder().encode(`\
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+woergnwerkjgnwkjrg
+-----END PGP PUBLIC KEY BLOCK-----`);    
+    assert.ok(isPgpPublicKeyBlock(signature));
 });

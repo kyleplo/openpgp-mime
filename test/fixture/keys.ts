@@ -28,3 +28,4 @@ export const receiverPublicKey = await readKey({
 export const receiverPrivateKey = await readPrivateKey({
     armoredKey: receiverPrivateKeyArmored
 });
+export { senderPublicKeyArmored, receiverPublicKeyArmored };

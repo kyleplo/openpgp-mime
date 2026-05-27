@@ -11,6 +11,8 @@ const beginPgpMessage = new Uint8Array("-----BEGIN PGP MESSAGE-----".split("").m
 const endPgpMessage = new Uint8Array("-----END PGP MESSAGE-----".split("").map(c => c.charCodeAt(0)));
 const beginPgpSignature = new Uint8Array("-----BEGIN PGP SIGNATURE-----".split("").map(c => c.charCodeAt(0)));
 const endPgpSignature = new Uint8Array("-----END PGP SIGNATURE-----".split("").map(c => c.charCodeAt(0)));
+const beginPgpPublicKeyBlock = new Uint8Array("-----BEGIN PGP PUBLIC KEY BLOCK-----".split("").map(c => c.charCodeAt(0)));
+const endPgpPublicKeyBlock = new Uint8Array("-----END PGP PUBLIC KEY BLOCK-----".split("").map(c => c.charCodeAt(0)));
 
 export function isPgpArmoredMessage (content: Uint8Array): boolean {
     return isPgpArmored(content, beginPgpMessage, endPgpMessage);
@@ -18,6 +20,10 @@ export function isPgpArmoredMessage (content: Uint8Array): boolean {
 
 export function isPgpArmoredSignature (content: Uint8Array): boolean {
     return isPgpArmored(content, beginPgpSignature, endPgpSignature);
+}
+
+export function isPgpPublicKeyBlock (content: Uint8Array): boolean {
+    return isPgpArmored(content, beginPgpPublicKeyBlock, endPgpPublicKeyBlock);
 }
 
 function isPgpArmored (content: Uint8Array, begin: Uint8Array, end: Uint8Array): boolean {
