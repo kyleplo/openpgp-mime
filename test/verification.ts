@@ -507,3 +507,139 @@ ${signature}`;
     assert.strictEqual(email.text, "hello world\n")
     assert.ok(email?.signatures && await email.signatures[0].verified)
 });
+
+test("Decrypt And Verify And Decrypt Encrypted And Signed And Encrypted Message", async () => {
+    const message = `Content-Type: text/plain
+
+hello world`
+    const innerArmoredMessage = await encrypt({
+        encryptionKeys: receiverPublicKey,
+        message: await createMessage({
+            text: message
+        })
+    });
+    const signingMessage = `Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"; boundary=foo
+
+--foo
+Content-Type: application/pgp-encrypted
+
+Version: 1
+
+--foo
+Content-Type: application/octet-stream
+
+${innerArmoredMessage}`
+    const signature = await sign({
+        signingKeys: senderPrivateKey,
+        message: await createMessage({
+            text: signingMessage
+        }),
+        detached: true
+    });
+    const signedMessage = `Content-Type: multipart/signed; boundary=bar; micalg=pgp-sha512;
+  protocol="application/pgp-signature"
+
+--bar
+${signingMessage}
+--bar
+Content-Type: application/pgp-signature
+
+${signature}`;
+    const outerArmoredMessage = await encrypt({
+        encryptionKeys: receiverPublicKey,
+        message: await createMessage({
+            text: signedMessage
+        })
+    });
+    const eml = `Mime-Version: 1.0
+Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"; boundary=baz
+
+--baz
+Content-Type: application/pgp-encrypted
+
+Version: 1
+
+--baz
+Content-Type: application/octet-stream
+
+${outerArmoredMessage}`;
+    const email = await OpenPGPMime.parse(eml, {
+        verifyOptions: {
+            verificationKeys: senderPublicKey
+        },
+        decryptOptions: {
+            decryptionKeys: receiverPrivateKey
+        }
+    });
+
+    assert.strictEqual(email.text, "hello world\n")
+    assert.ok(email?.signatures && await email.signatures[0].verified)
+});
+
+test("Verify And Decrypt And Verify Signed And Encrypted Message And Signed", async () => {
+    const message = `Content-Type: text/plain
+
+hello world`
+    const innerSignature = await sign({
+        signingKeys: senderPrivateKey,
+        message: await createMessage({
+            text: message
+        }),
+        detached: true
+    });
+    const signedMessage = `Content-Type: multipart/signed; boundary=baz; micalg=pgp-sha512;
+  protocol="application/pgp-signature"
+
+--baz
+${message}
+--baz
+Content-Type: application/pgp-signature
+
+${innerSignature}`;
+    const armoredMessage = await encrypt({
+        encryptionKeys: receiverPublicKey,
+        message: await createMessage({
+            text: signedMessage
+        })
+    });
+    const signingMessage = `Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"; boundary=foo
+
+--foo
+Content-Type: application/pgp-encrypted
+
+Version: 1
+
+--foo
+Content-Type: application/octet-stream
+
+${armoredMessage}`
+    const outerSignature = await sign({
+        signingKeys: senderPrivateKey,
+        message: await createMessage({
+            text: signingMessage
+        }),
+        detached: true
+    });
+    const eml = `Content-Type: multipart/signed; boundary=bar; micalg=pgp-sha512;
+  protocol="application/pgp-signature"
+
+--bar
+${signingMessage}
+--bar
+Content-Type: application/pgp-signature
+
+${outerSignature}`;
+    const email = await OpenPGPMime.parse(eml, {
+        verifyOptions: {
+            verificationKeys: senderPublicKey
+        },
+        decryptOptions: {
+            decryptionKeys: receiverPrivateKey
+        }
+    });
+
+    assert.strictEqual(email.text, "hello world\n")
+    assert.strictEqual(email?.signatures?.length, 2)
+    assert.ok(await email.signatures[0].verified)
+    assert.ok(await email.signatures[1].verified)
+});
