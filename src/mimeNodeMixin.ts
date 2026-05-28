@@ -1,7 +1,7 @@
 import { readMessage, decrypt, verify, createMessage, readSignature, readKey } from "openpgp";
 // @ts-expect-error
 import MimeNodeStub from "../node_modules/postal-mime/src/mime-node.js"
-import { OpenPGPMime } from "./OpenPGPMime.js";
+import { OpenPGPMime, VerificationResult } from "./OpenPGPMime.js";
 import { isPgpArmoredMessage, isPgpArmoredSignature, isPgpPublicKeyBlock } from "./util.js";
 
 const mimeNodeFinalize = MimeNodeStub.prototype.finalize;
@@ -27,6 +27,7 @@ Object.assign(MimeNodeStub.prototype, {
                 message: message
             }, thisMimeNode.postalMime.options.decryptOptions));
             thisMimeNode.postalMime.signatures = thisMimeNode.postalMime.signatures.concat(decrypted.signatures);
+            thisMimeNode.signatures = (thisMimeNode.signatures || []).concat(decrypted.signatures);
 
             if (thisMimeNode.options?.parentMultipartType === "encrypted") {
                 thisMimeNode.state = "header";
@@ -89,6 +90,7 @@ Object.assign(MimeNodeStub.prototype, {
                 signature: signature
             }, thisMimeNode.postalMime.options.verifyOptions));
             thisMimeNode.postalMime.signatures = thisMimeNode.postalMime.signatures.concat(verification.signatures);
+            thisMimeNode.parentNode.signatures = (thisMimeNode.parentNode.signatures || []).concat(verification.signatures);
         } else if (isPgpPublicKeyBlock(content) && thisMimeNode.contentType.parsed?.value === "application/pgp-keys") {
             try {
                 const key = await readKey({
@@ -98,6 +100,11 @@ Object.assign(MimeNodeStub.prototype, {
                 thisMimeNode.postalMime.keys.push(key);
             } catch {}
         }
+
+        if (!thisMimeNode.contentId) {
+            thisMimeNode.contentId = Symbol();
+        }
+        thisMimeNode.postalMime.nodeMap.set(thisMimeNode.contentId, thisMimeNode);
     }
 })
 
@@ -138,6 +145,8 @@ declare class MimeNode extends MimeNodeStub {
     depth: number
     finalize (): Promise<void>
     signedContent?: Uint8Array[]
+    signatures?: VerificationResult[]
+    contentId?: string | Symbol
 }
 
 export { MimeNode };

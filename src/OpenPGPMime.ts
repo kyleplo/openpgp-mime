@@ -1,6 +1,6 @@
 import { PostalMime } from "./PostalMime.js"
-import { Email, PostalMimeOptions, RawEmail } from "postal-mime";
-import { DecryptOptions, KeyID, PublicKey, Signature, VerifyOptions } from "openpgp";
+import { Attachment, Email, PostalMimeOptions, RawEmail } from "postal-mime";
+import { DecryptMessageResult, DecryptOptions, PublicKey, VerifyOptions } from "openpgp";
 import "./mimeNodeMixin.js"
 import { MimeNode } from "./mimeNodeMixin.js";
 
@@ -8,12 +8,14 @@ declare module "./PostalMime.js" {
     interface PostalMime {
         currentNode: MimeNode
         processLine (line: Uint8Array, final: boolean): Promise<void>
+        isInlineTextNode (node: MimeNode): boolean
     }
 }
 
 export class OpenPGPMime extends PostalMime {
     options: OpenPGPMimeOptions;
     signatures: VerificationResult[] = [];
+    nodeMap: Map<(string | Symbol), MimeNode> = new Map();
     keys: PublicKey[] = [];
 
     constructor (options?: OpenPGPMimeOptions) {
@@ -34,6 +36,22 @@ export class OpenPGPMime extends PostalMime {
             email.attachments = email.attachments.filter(attachment => attachment.mimeType !== "application/pgp-encrypted" && attachment.mimeType !== "application/pgp-signature" && attachment.mimeType !== "application/pgp-keys")
         }
 
+        email.attachments.forEach((attachment: OpenPGPAttachment) => {
+            if (attachment.contentId && this.nodeMap.has(attachment.contentId)) {
+                attachment.signatures = [];
+                var node = this.nodeMap.get(attachment.contentId);
+                while (node) {
+                    attachment.signatures = attachment.signatures.concat(node.signatures || []);
+                    node = node.parentNode;
+                }
+
+                if (typeof attachment.contentId === "symbol") {
+                    delete attachment.contentId;
+                    delete attachment.related;
+                }
+            }
+        })
+        this.nodeMap.clear();
         return email;
     }
 
@@ -57,6 +75,13 @@ export class OpenPGPMime extends PostalMime {
             }
         }
     }
+
+    isInlineTextNode(node: MimeNode): boolean {
+        if (this.options.inlineTextAsAttachments) {
+            return false;
+        }
+        return super.isInlineTextNode(node);
+    }
 }
 
 export type OpenPGPMimeOptions = PostalMimeOptions & {
@@ -64,16 +89,18 @@ export type OpenPGPMimeOptions = PostalMimeOptions & {
     verifyOptions?: Omit<Omit<VerifyOptions, "signature">, "message">
     keepPgpAttachments?: boolean
     preventUnencapsulatedMessages?: boolean
+    inlineTextAsAttachments?: boolean
 }
+
+export type OpenPGPAttachment = Attachment & {
+    signatures?: VerificationResult[]
+};
 
 export type OpenPGPEmail = Email & {
     signatures?: VerificationResult[],
-    keys?: PublicKey[]
+    keys?: PublicKey[],
+    attachments: OpenPGPAttachment[]
 }
 
-// taken from OpenPGP.js type definitions, is not exported from there
-export interface VerificationResult {
-    keyID: KeyID,
-    verified: Promise<true>,
-    signature: Promise<Signature>
-}
+// OpenPGP.js doesn't export VerificationResult directly
+export type VerificationResult = DecryptMessageResult["signatures"][0]
