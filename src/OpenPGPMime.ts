@@ -58,10 +58,8 @@ export class OpenPGPMime extends PostalMime {
     async processLine (line: Uint8Array, final: boolean, decryptedDepth = 0): Promise<void> {
         await super.processLine(line, final);
 
-        var parent = this.currentNode;
-        while (parent.parentNode) {
-            parent = parent.parentNode;
-
+        var parent: MimeNode | undefined = this.currentNode;
+        while (parent) {
             if (parent.depth < decryptedDepth) {
                 return;
             }
@@ -73,6 +71,8 @@ export class OpenPGPMime extends PostalMime {
                     parent.signedContent = [];
                 }
             }
+
+            parent = parent.parentNode;
         }
     }
 
