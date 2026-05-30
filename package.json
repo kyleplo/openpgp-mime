@@ -6,7 +6,10 @@
   "author": "kyleplo",
   "type": "module",
   "scripts": {
-    "test": "npx tsx --test"
+    "prepublishOnly": "npm run compile",
+    "test": "npx tsx --test",
+    "compile": "npm run clean && tsc -p .",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "openpgp": "^6.3.0",
@@ -14,9 +17,22 @@
   },
   "devDependencies": {
     "@types/libqp": "^1.1.3",
-    "@types/node": "^25.6.2",
+    "@types/node": "^25.9.1",
     "libqp": "^2.1.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3"
+  },
+  "main": "dist/index",
+  "types": "dist/index",
+  "keywords": [
+    "openpgp",
+    "mime"
+  ],
+  "bugs": {
+    "url": "http://github.com/kyleplo/openpgp-mime/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/kyleplo/openpgp-mime.git"
   }
 }

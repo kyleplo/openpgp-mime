@@ -1,8 +1,24 @@
 import { readMessage, decrypt, verify, createMessage, readSignature, readKey } from "openpgp";
-// @ts-expect-error
-import MimeNodeStub from "../node_modules/postal-mime/src/mime-node.js"
 import { OpenPGPMime, VerificationResult } from "./OpenPGPMime.js";
 import { isPgpArmoredMessage, isPgpArmoredSignature, isPgpPublicKeyBlock } from "./util.js";
+
+var MimeNodeStub;
+try {
+    // @ts-expect-error
+    MimeNodeStub = (await import("../node_modules/postal-mime/src/mime-node.js")).default;
+} catch {
+    try {
+        // @ts-expect-error
+        MimeNodeStub = (await import("../../node_modules/postal-mime/src/mime-node.js")).default;
+    } catch {
+        try {
+            // @ts-expect-error
+            MimeNodeStub = (await import("../../../node_modules/postal-mime/src/mime-node.js")).default;
+        } catch {
+            throw new Error("Failed to apply MimeNode mixin");
+        }
+    }
+}
 
 const mimeNodeFinalize = MimeNodeStub.prototype.finalize;
 Object.assign(MimeNodeStub.prototype, {
@@ -111,7 +127,7 @@ Object.assign(MimeNodeStub.prototype, {
 declare class MimeNode extends MimeNodeStub {
     finalizeChildNodes(): Promise<void>
     setupContentDecoder(encoding: string): void
-    childNodes: MimeNodeStub[]
+    childNodes: MimeNode[]
     contentType: {
         value: string,
         parsed?: {
