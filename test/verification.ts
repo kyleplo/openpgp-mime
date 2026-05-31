@@ -2,7 +2,7 @@ import test from "node:test"
 import assert from "node:assert"
 
 import { OpenPGPMime } from "../src/OpenPGPMime.js"
-import { createMessage, encrypt, sign } from "openpgp"
+import { createMessage, encrypt, KeyID, sign } from "openpgp"
 import { receiverPrivateKey, receiverPublicKey, senderPrivateKey, senderPublicKey } from "./fixture/keys.js";
 
 test("Verify Signed Message", async () => {
@@ -642,4 +642,37 @@ ${outerSignature}`;
     assert.strictEqual(email?.signatures?.length, 2)
     assert.ok(await email.signatures[0].verified)
     assert.ok(await email.signatures[1].verified)
+});
+
+test("Verify Signed Message Automatically Selecting Keys", async () => {
+    const message = `Content-Type: text/plain
+
+hello world`
+    const signature = await sign({
+        signingKeys: senderPrivateKey,
+        message: await createMessage({
+            text: message
+        }),
+        detached: true
+    });
+    const eml = `Mime-Version: 1.0
+Content-Type: multipart/signed; boundary=foo; micalg=pgp-sha512;
+  protocol="application/pgp-signature"
+
+--foo
+${message}
+--foo
+Content-Type: application/pgp-signature
+
+${signature}`;
+    const email = await OpenPGPMime.parse(eml, {
+        getVerificationKey(keyIds: KeyID[]) {
+            if (keyIds.length > 0 && senderPublicKey.getKeyIDs().find(keyId => keyId.equals(keyIds[0]))) {
+                return senderPublicKey;
+            }
+            return;
+        }
+    });
+    assert.strictEqual(email.text, "hello world\n")
+    assert.ok(email?.signatures && await email.signatures[0].verified)
 });

@@ -1,6 +1,6 @@
 import { PostalMime } from "./PostalMime.js"
 import { Attachment, Email, PostalMimeOptions, RawEmail } from "postal-mime";
-import { DecryptMessageResult, DecryptOptions, PublicKey, VerifyOptions } from "openpgp";
+import { DecryptMessageResult, DecryptOptions, KeyID, PrivateKey, PublicKey, VerifyOptions } from "openpgp";
 import "./mimeNodeMixin.js"
 import { MimeNode } from "./mimeNodeMixin.js";
 
@@ -21,6 +21,23 @@ export class OpenPGPMime extends PostalMime {
     constructor (options?: OpenPGPMimeOptions) {
         super(options);
         this.options = options || {};
+
+        if (this.options.verifyOptions?.verificationKeys && !this.options.decryptOptions?.verificationKeys) {
+            if (!this.options.decryptOptions) {
+                this.options.decryptOptions = {};
+            }
+            this.options.decryptOptions.verificationKeys = this.options.verifyOptions?.verificationKeys;
+        }
+
+        if (this.options.decryptOptions?.verificationKeys && !this.options.verifyOptions?.verificationKeys) {
+            if (!this.options.verifyOptions) {
+                this.options.verifyOptions = {
+                    verificationKeys: this.options.decryptOptions?.verificationKeys
+                };
+            } else {
+                this.options.verifyOptions.verificationKeys = this.options.decryptOptions?.verificationKeys;
+            }
+        }
     }
 
     static async parse (rawEmail: RawEmail, options?: OpenPGPMimeOptions): Promise<OpenPGPEmail> {
@@ -90,6 +107,8 @@ export type OpenPGPMimeOptions = PostalMimeOptions & {
     keepPgpAttachments?: boolean
     preventUnencapsulatedMessages?: boolean
     inlineTextAsAttachments?: boolean
+    getVerificationKey?(keyIds: KeyID[]): Promise<PublicKey | undefined> | PublicKey | undefined
+    getDecryptionKey?(keyIds: KeyID[]): Promise<PrivateKey | undefined> | PrivateKey | undefined
 }
 
 export type OpenPGPAttachment = Attachment & {

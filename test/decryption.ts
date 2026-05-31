@@ -2,7 +2,7 @@ import test from "node:test"
 import assert from "node:assert"
 
 import { OpenPGPMime } from "../src/OpenPGPMime.js"
-import { createMessage, encrypt } from "openpgp"
+import { createMessage, encrypt, KeyID } from "openpgp"
 import { receiverPrivateKey, receiverPublicKey, senderPrivateKey, senderPublicKey } from "./fixture/keys.js";
 import { splitLines } from "./fixture/splitlines.js";
 import { encode, wrap } from "libqp"
@@ -534,5 +534,35 @@ ${armoredMessage}`;
         attachmentEncoding: "utf8"
     });
     assert.strictEqual(email.attachments[0].content, "not actually an image but whatever\n")
+    assert.ok(email?.signatures && await email.signatures[0].verified)
+});
+
+test("Decrypt Encrypted Message Automatically Selecting Keys", async () => {
+    const armoredMessage = await encrypt({
+        encryptionKeys: receiverPublicKey,
+        signingKeys: senderPrivateKey,
+        message: await createMessage({
+            text: "hello world"
+        })
+    });
+    const eml = `Mime-Version: 1.0
+Content-Type: text/plain
+
+${armoredMessage}`;
+    const email = await OpenPGPMime.parse(eml, {
+        getDecryptionKey(keyIds: KeyID[]) {
+            if (keyIds.length > 0 && receiverPrivateKey.getKeyIDs().find(keyId => keyId.equals(keyIds[0]))) {
+                return receiverPrivateKey;
+            }
+            return;
+        },
+        getVerificationKey(keyIds: KeyID[]) {
+            if (keyIds.length > 0 && senderPublicKey.getKeyIDs().find(keyId => keyId.equals(keyIds[0]))) {
+                return senderPublicKey;
+            }
+            return;
+        }
+    });
+    assert.strictEqual(email.text, "hello world\n")
     assert.ok(email?.signatures && await email.signatures[0].verified)
 });
