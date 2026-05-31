@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert"
 
-import { OpenPGPMime } from "../src/OpenPGPMime.js"
+import OpenPGPMime from "../index.js"
 import { createMessage, encrypt, KeyID, sign } from "openpgp"
 import { receiverPrivateKey, receiverPublicKey, senderPrivateKey, senderPublicKey } from "./fixture/keys.js";
 

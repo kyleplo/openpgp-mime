@@ -102,21 +102,31 @@ export class OpenPGPMime extends PostalMime {
 }
 
 export type OpenPGPMimeOptions = PostalMimeOptions & {
+    /** Decrypt options to be passed to OpenPGP.js */
     decryptOptions?: Omit<DecryptOptions, "message">
+    /** Verify options to be passed to OpenPGP.js */
     verifyOptions?: Omit<Omit<VerifyOptions, "signature">, "message">
+    /** Whether to preserve attachments containing PGP metadata */
     keepPgpAttachments?: boolean
+    /** Whether to disallow PGP encrypted messages that are not wrapped in a multipart/encrypted MIME node */
     preventUnencapsulatedMessages?: boolean
+    /** Whether to return inline text nodes (text/plain or text/html) as attachments, allowing their individual signatures to be enumerated */
     inlineTextAsAttachments?: boolean
+    /** Function for dynamically selecting a verification key from a given key ID */
     getVerificationKey?(keyIds: KeyID[]): Promise<PublicKey | undefined> | PublicKey | undefined
+    /** Function for dynamically selecting a decryption key from a given key ID */
     getDecryptionKey?(keyIds: KeyID[]): Promise<PrivateKey | undefined> | PrivateKey | undefined
 }
 
 export type OpenPGPAttachment = Attachment & {
+    /** Signature verification results for this attachment */
     signatures?: VerificationResult[]
 };
 
 export type OpenPGPEmail = Email & {
+    /** Signature verification results for the entire email */
     signatures?: VerificationResult[],
+    /** Public keys included as attachments in this email */
     keys?: PublicKey[],
     attachments: OpenPGPAttachment[]
 }

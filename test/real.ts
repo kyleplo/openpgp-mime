@@ -2,7 +2,7 @@ import test from "node:test"
 import assert from "node:assert"
 import { readFile, stat } from "node:fs/promises"
 import { decryptKey, readKey, readPrivateKey } from "openpgp"
-import { OpenPGPMime } from "../src/OpenPGPMime.js";
+import OpenPGPMime from "../index.js"
 import { exit } from "node:process";
 
 try {

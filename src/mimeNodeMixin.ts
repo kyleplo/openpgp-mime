@@ -162,12 +162,12 @@ Object.assign(MimeNodeStub.prototype, {
     }
 })
 
-async function selectKeyForSignatures<T extends Key> (signatures: Signature[], getKey: (keyIds: KeyID[]) => Promise<T | undefined>): Promise<Signature | undefined> {
+async function selectKeyForSignatures<T extends Key> (signatures: Signature[], getKey: (keyIds: KeyID[]) => Promise<T | undefined>): Promise<T | undefined> {
     for (const signature of signatures) {
         if (signature.getSigningKeyIDs().length > 0) {
             const key = await getKey(signature.getSigningKeyIDs());
             if (key) {
-                return signature;
+                return key;
             }
         }
     }
