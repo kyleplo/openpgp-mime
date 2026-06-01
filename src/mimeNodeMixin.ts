@@ -215,4 +215,4 @@ declare class MimeNode extends MimeNodeStub {
     key: PublicKey
 }
 
-export { MimeNode };
+export type { MimeNode };
