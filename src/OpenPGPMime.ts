@@ -16,27 +16,25 @@ export class OpenPGPMime extends PostalMime {
     options: OpenPGPMimeOptions;
     signatures: VerificationResult[] = [];
     nodeMap: Map<(string | Symbol), MimeNode> = new Map();
-    keys: PublicKey[] = [];
 
     constructor (options?: OpenPGPMimeOptions) {
         super(options);
         this.options = options || {};
 
-        if (this.options.verifyOptions?.verificationKeys && !this.options.decryptOptions?.verificationKeys) {
-            if (!this.options.decryptOptions) {
-                this.options.decryptOptions = {};
-            }
-            this.options.decryptOptions.verificationKeys = this.options.verifyOptions?.verificationKeys;
-        }
-
-        if (this.options.decryptOptions?.verificationKeys && !this.options.verifyOptions?.verificationKeys) {
-            if (!this.options.verifyOptions) {
-                this.options.verifyOptions = {
-                    verificationKeys: this.options.decryptOptions?.verificationKeys
-                };
-            } else {
-                this.options.verifyOptions.verificationKeys = this.options.decryptOptions?.verificationKeys;
-            }
+        if (this.options.verifyOptions && !this.options.decryptOptions) {
+            this.options.decryptOptions = {
+                verificationKeys: this.options.verifyOptions?.verificationKeys,
+                config: this.options.verifyOptions?.config,
+                expectSigned: this.options.verifyOptions.expectSigned,
+                date: this.options.verifyOptions.date || undefined
+            };
+        } else if (this.options.decryptOptions && !this.options.verifyOptions) {
+            this.options.verifyOptions = {
+                verificationKeys: this.options.decryptOptions?.verificationKeys || [],
+                config: this.options.decryptOptions?.config,
+                expectSigned: this.options.decryptOptions.expectSigned,
+                date: this.options.decryptOptions.date
+            };
         }
     }
 
@@ -47,16 +45,19 @@ export class OpenPGPMime extends PostalMime {
     async parse (rawEmail: RawEmail): Promise<OpenPGPEmail> {
         const email: OpenPGPEmail = await super.parse(rawEmail);
         email.signatures = this.signatures;
-        email.keys = this.keys;
 
         if (!this.options.keepPgpAttachments) {
-            email.attachments = email.attachments.filter(attachment => attachment.mimeType !== "application/pgp-encrypted" && attachment.mimeType !== "application/pgp-signature" && attachment.mimeType !== "application/pgp-keys")
+            email.attachments = email.attachments.filter(attachment => attachment.mimeType !== "application/pgp-encrypted" && attachment.mimeType !== "application/pgp-signature")
         }
 
         email.attachments.forEach((attachment: OpenPGPAttachment) => {
             if (attachment.contentId && this.nodeMap.has(attachment.contentId)) {
                 attachment.signatures = [];
                 var node = this.nodeMap.get(attachment.contentId);
+                if (node && node.key && attachment.mimeType === "application/pgp-keys") {
+                    attachment.key = node.key;
+                }
+
                 while (node) {
                     attachment.signatures = attachment.signatures.concat(node.signatures || []);
                     node = node.parentNode;
@@ -106,7 +107,7 @@ export type OpenPGPMimeOptions = PostalMimeOptions & {
     decryptOptions?: Omit<DecryptOptions, "message">
     /** Verify options to be passed to OpenPGP.js */
     verifyOptions?: Omit<Omit<VerifyOptions, "signature">, "message">
-    /** Whether to preserve attachments containing PGP metadata */
+    /** Whether to preserve attachments containing PGP metadata (application/pgp-encrypted and application/pgp-signature) */
     keepPgpAttachments?: boolean
     /** Whether to disallow PGP encrypted messages that are not wrapped in a multipart/encrypted MIME node */
     preventUnencapsulatedMessages?: boolean
@@ -121,13 +122,13 @@ export type OpenPGPMimeOptions = PostalMimeOptions & {
 export type OpenPGPAttachment = Attachment & {
     /** Signature verification results for this attachment */
     signatures?: VerificationResult[]
+    /** OpenPGP public key from a application/pgp-keys attachment */
+    key?: PublicKey
 };
 
 export type OpenPGPEmail = Email & {
     /** Signature verification results for the entire email */
     signatures?: VerificationResult[],
-    /** Public keys included as attachments in this email */
-    keys?: PublicKey[],
     attachments: OpenPGPAttachment[]
 }
 

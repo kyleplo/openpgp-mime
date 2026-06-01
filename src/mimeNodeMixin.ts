@@ -1,4 +1,4 @@
-import { readMessage, decrypt, verify, createMessage, readSignature, readKey, DecryptOptions, VerifyOptions, Key, Signature, KeyID } from "openpgp";
+import { readMessage, decrypt, verify, createMessage, readSignature, readKey, DecryptOptions, VerifyOptions, Key, Signature, KeyID, PublicKey } from "openpgp";
 import { OpenPGPMime, VerificationResult } from "./OpenPGPMime.js";
 import { isPgpArmoredMessage, isPgpArmoredSignature, isPgpPublicKeyBlock } from "./util.js";
 
@@ -147,11 +147,9 @@ Object.assign(MimeNodeStub.prototype, {
             thisMimeNode.parentNode.signatures = (thisMimeNode.parentNode.signatures || []).concat(verification.signatures);
         } else if (isPgpPublicKeyBlock(content) && thisMimeNode.contentType.parsed?.value === "application/pgp-keys") {
             try {
-                const key = await readKey({
+                thisMimeNode.key = await readKey({
                     armoredKey: new TextDecoder().decode(content)
                 });
-
-                thisMimeNode.postalMime.keys.push(key);
             } catch {}
         }
 
@@ -214,6 +212,7 @@ declare class MimeNode extends MimeNodeStub {
     signedContent?: Uint8Array[]
     signatures?: VerificationResult[]
     contentId?: string | Symbol
+    key: PublicKey
 }
 
 export { MimeNode };

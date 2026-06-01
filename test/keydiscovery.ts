@@ -10,8 +10,8 @@ Content-Type: application/pgp-keys
 
 ${senderPublicKeyArmored}`
     const email = await OpenPGPMime.parse(eml);
-    assert.strictEqual(email.keys?.length, 1)
-    assert.strictEqual(email.keys[0].getFingerprint(), senderPublicKey.getFingerprint())
+    assert.ok(email.attachments[0].key)
+    assert.strictEqual(email.attachments[0].key.getFingerprint(), senderPublicKey.getFingerprint())
 });
 
 test("Discover Invalid Key", async () => {
@@ -20,7 +20,7 @@ Content-Type: application/pgp-keys
 
 ${senderPublicKeyArmored.replace("=", "A")}`
     const email = await OpenPGPMime.parse(eml);
-    assert.strictEqual(email.keys?.length, 0);
+    assert.ok(!email.attachments[0].key);
 });
 
 test("Discover Key In Multipart Message", async () => {
@@ -37,8 +37,8 @@ Content-Type: application/pgp-keys
 ${senderPublicKeyArmored}`
     const email = await OpenPGPMime.parse(eml);
     assert.strictEqual(email.text, "hello world\n")
-    assert.strictEqual(email.keys?.length, 1)
-    assert.strictEqual(email.keys[0].getFingerprint(), senderPublicKey.getFingerprint())
+    assert.ok(email.attachments[0].key)
+    assert.strictEqual(email.attachments[0].key.getFingerprint(), senderPublicKey.getFingerprint())
 });
 
 test("Discover Key In Encrypted Multipart Message", async () => {
@@ -69,6 +69,7 @@ ${armoredMessage}`
             verificationKeys: senderPublicKey
         }
 }   );
-    assert.strictEqual(email.keys?.length, 1)
-    assert.strictEqual(email.keys[0].getFingerprint(), senderPublicKey.getFingerprint())
+    assert.ok(email.attachments[0].key)
+    assert.strictEqual(email.attachments[0].key.getFingerprint(), senderPublicKey.getFingerprint())
+    assert.ok(email.attachments[0].signatures && await email.attachments[0].signatures[0].verified)
 });
