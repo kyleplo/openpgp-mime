@@ -15,7 +15,12 @@ try {
             // @ts-expect-error
             MimeNodeStub = (await import("../../../node_modules/postal-mime/src/mime-node.js")).default;
         } catch {
-            throw new Error("Failed to apply MimeNode mixin");
+            try {
+                // @ts-expect-error
+                MimeNodeStub = (await import("../../../../node_modules/postal-mime/src/mime-node.js")).default;
+            } catch {
+                throw new Error("Failed to apply MimeNode mixin");
+            }
         }
     }
 }

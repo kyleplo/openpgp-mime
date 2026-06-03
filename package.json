@@ -1,7 +1,7 @@
 {
   "name": "openpgp-mime",
-  "version": "1.0.0",
-  "description": "",
+  "version": "1.0.1",
+  "description": "Email parsing library based upon postal-mime but with added support for PGP encrypted and signed emails as specified in RFC 3156",
   "license": "LGPL-3.0-or-later",
   "author": "kyleplo",
   "type": "module",
@@ -33,6 +33,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "http://github.com/kyleplo/openpgp-mime.git"
+    "url": "git+ssh://git@github.com/kyleplo/openpgp-mime.git"
   }
 }
