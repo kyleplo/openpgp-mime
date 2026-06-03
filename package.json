@@ -22,8 +22,8 @@
     "tsx": "^4.21.0",
     "typescript": "^6.0.3"
   },
-  "main": "dist/index",
-  "types": "dist/index",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "keywords": [
     "openpgp",
     "mime"
@@ -34,5 +34,8 @@
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/kyleplo/openpgp-mime.git"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }
