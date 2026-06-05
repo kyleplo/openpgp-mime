@@ -23,14 +23,7 @@ export class OpenPGPMime extends PostalMime {
         super(options);
         this.options = options || {};
 
-        if (this.options.verifyOptions && !this.options.decryptOptions) {
-            this.options.decryptOptions = {
-                verificationKeys: this.options.verifyOptions?.verificationKeys,
-                config: this.options.verifyOptions?.config,
-                expectSigned: this.options.verifyOptions.expectSigned,
-                date: this.options.verifyOptions.date || undefined
-            };
-        } else if (this.options.decryptOptions && !this.options.verifyOptions) {
+        if (this.options.decryptOptions && !this.options.verifyOptions) {
             this.options.verifyOptions = {
                 verificationKeys: this.options.decryptOptions?.verificationKeys || [],
                 config: this.options.decryptOptions?.config,
@@ -47,14 +40,6 @@ export class OpenPGPMime extends PostalMime {
                 signingUserIDs: this.options.encryptOptions.signingUserIDs,
                 signatureNotations: this.options.encryptOptions.signatureNotations,
                 config: this.options.encryptOptions.config
-            };
-        } else if (this.options.signOptions && !this.options.encryptOptions) {
-            this.options.encryptOptions = {
-                signingKeys: this.options.signOptions.signingKeys,
-                date: this.options.signOptions.date,
-                signingKeyIDs: this.options.signOptions.signingKeyIDs,
-                signingUserIDs: this.options.signOptions.signingUserIDs,
-                config: this.options.signOptions.config
             };
         }
     }
