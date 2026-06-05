@@ -1,31 +1,31 @@
-import { generateKey, readKey, readPrivateKey } from "openpgp";
+import { generateKey, Key, PrivateKey, readKey, readPrivateKey, UserID } from "openpgp";
 
-const { publicKey: senderPublicKeyArmored, privateKey: senderPrivateKeyArmored } = await generateKey({
-    userIDs: [
-        {
-            name: "Sender",
-            email: "sender@example.com"
-        }
-    ],
+async function generateKeyPair (user: UserID): Promise<[string, Key, PrivateKey]> {
+    const { publicKey, privateKey } = await generateKey({
+        userIDs: [user],
+    });
+    return [
+        publicKey,
+        await readKey({
+            armoredKey: publicKey
+        }),
+        await readPrivateKey({
+            armoredKey: privateKey
+        })
+    ]
+}
+
+export const [ senderPublicKeyArmored, senderPublicKey, senderPrivateKey ] = await generateKeyPair({
+    name: "Sender",
+    email: "sender@example.com"
 });
-export const senderPublicKey = await readKey({
-    armoredKey: senderPublicKeyArmored
+
+export const [ receiverPublicKeyArmored, receiverPublicKey, receiverPrivateKey ] = await generateKeyPair({
+    name: "Receiver",
+    email: "receiver@example.com"
 });
-export const senderPrivateKey = await readPrivateKey({
-    armoredKey: senderPrivateKeyArmored
+
+export const [ receiver2PublicKeyArmored, receiver2PublicKey, receiver2PrivateKey ] = await generateKeyPair({
+    name: "Receiver 2",
+    email: "receiver2@example.com"
 });
-const { publicKey: receiverPublicKeyArmored, privateKey: receiverPrivateKeyArmored } = await generateKey({
-    userIDs: [
-        {
-            name: "Receiver",
-            email: "receiver@example.com"
-        }
-    ],
-});
-export const receiverPublicKey = await readKey({
-    armoredKey: receiverPublicKeyArmored
-});
-export const receiverPrivateKey = await readPrivateKey({
-    armoredKey: receiverPrivateKeyArmored
-});
-export { senderPublicKeyArmored, receiverPublicKeyArmored };

@@ -1,14 +1,16 @@
 import { PostalMime } from "./PostalMime.js"
 import { Attachment, Email, PostalMimeOptions, RawEmail } from "postal-mime";
-import { DecryptMessageResult, DecryptOptions, KeyID, PrivateKey, PublicKey, VerifyOptions } from "openpgp";
+import { config, createMessage, DecryptMessageResult, DecryptOptions, encrypt, EncryptOptions, enums, KeyID, PrivateKey, PublicKey, sign, SignOptions, VerifyOptions } from "openpgp";
 import "./mimeNodeMixin.js"
 import { MimeNode } from "./mimeNodeMixin.js";
+import { normalizeRawEmail } from "./util.js";
 
 declare module "./PostalMime.js" {
     interface PostalMime {
         currentNode: MimeNode
         processLine (line: Uint8Array, final: boolean): Promise<void>
         isInlineTextNode (node: MimeNode): boolean
+        resolveStream (stream: ReadableStream): Promise<Uint8Array>
     }
 }
 
@@ -34,6 +36,25 @@ export class OpenPGPMime extends PostalMime {
                 config: this.options.decryptOptions?.config,
                 expectSigned: this.options.decryptOptions.expectSigned,
                 date: this.options.decryptOptions.date
+            };
+        }
+
+        if (this.options.encryptOptions && !this.options.signOptions) {
+            this.options.signOptions = {
+                signingKeys: this.options.encryptOptions.signingKeys as PrivateKey | PrivateKey[],
+                signingKeyIDs: this.options.encryptOptions.signingKeyIDs,
+                date: this.options.encryptOptions.date,
+                signingUserIDs: this.options.encryptOptions.signingUserIDs,
+                signatureNotations: this.options.encryptOptions.signatureNotations,
+                config: this.options.encryptOptions.config
+            };
+        } else if (this.options.signOptions && !this.options.encryptOptions) {
+            this.options.encryptOptions = {
+                signingKeys: this.options.signOptions.signingKeys,
+                date: this.options.signOptions.date,
+                signingKeyIDs: this.options.signOptions.signingKeyIDs,
+                signingUserIDs: this.options.signOptions.signingUserIDs,
+                config: this.options.signOptions.config
             };
         }
     }
@@ -100,6 +121,57 @@ export class OpenPGPMime extends PostalMime {
         }
         return super.isInlineTextNode(node);
     }
+
+    static async apply (rawEmail: RawEmail, options?: OpenPGPMimeOptions): Promise<string> {
+        return (new OpenPGPMime(options)).apply(rawEmail);
+    }
+
+    async apply (rawEmail: RawEmail): Promise<string> {
+        const rawEmailBuffer = await normalizeRawEmail(rawEmail);
+        const decodedRawEmail = typeof rawEmail === "string" ? rawEmail : new TextDecoder().decode(rawEmailBuffer)
+        const email: Email = await this.parse(rawEmailBuffer);
+        const mimeBoundary = crypto.randomUUID();
+        const headerLines = email.headerLines.filter(line => !line.key.startsWith("content-") && !line.key.startsWith("arc-")).map(line => line.line).join("\n");
+
+        if (this.options.encryptOptions?.encryptionKeys || this.options.encryptOptions?.encryptionKeyIDs || this.options.encryptOptions?.encryptionUserIDs) {
+            const encryptedMessage = await encrypt(Object.assign({
+                message: await createMessage({
+                    text: decodedRawEmail
+                })
+            }, this.options.encryptOptions))
+            return `${headerLines}
+Content-Type: multipart/encrypted; protocol="application/pgp-encrypted"; boundary=${mimeBoundary}
+
+--${mimeBoundary}
+Content-Type: application/pgp-encrypted
+
+Version: 1
+
+--${mimeBoundary}
+Content-Type: application/octet-stream
+
+${encryptedMessage}`
+        } else {
+            const signature = await sign(Object.assign({
+                message: await createMessage({
+                    text: decodedRawEmail
+                }),
+                detached: true
+            }, this.options.signOptions));
+            const hashAlg: [string, unknown] = Object.entries(enums.hash).find(entry => entry[1] === config.preferredHashAlgorithm) || ["sha256", 8]
+
+            return `${headerLines}
+Content-Type: multipart/signed; micalg=pgp-${hashAlg[0]};
+  protocol="application/pgp-signature"; boundary=${mimeBoundary}
+
+--${mimeBoundary}
+${decodedRawEmail}
+--${mimeBoundary}
+Content-Type: application/pgp-signature
+
+${signature}`
+        }
+    }
 }
 
 export type OpenPGPMimeOptions = PostalMimeOptions & {
@@ -107,6 +179,10 @@ export type OpenPGPMimeOptions = PostalMimeOptions & {
     decryptOptions?: Omit<DecryptOptions, "message">
     /** Verify options to be passed to OpenPGP.js */
     verifyOptions?: Omit<Omit<VerifyOptions, "signature">, "message">
+    /** Encrypt options to be passed to OpenPGP.js */
+    encryptOptions?: Omit<Omit<Omit<EncryptOptions, "signature">, "format">, "message">
+    /** Sign options to be passed to OpenPGP.js */
+    signOptions?: Omit<Omit<Omit<SignOptions, "detached">, "format">, "message">
     /** Whether to preserve attachments containing PGP metadata (application/pgp-encrypted and application/pgp-signature) */
     keepPgpAttachments?: boolean
     /** Whether to disallow PGP encrypted messages that are not wrapped in a multipart/encrypted MIME node */

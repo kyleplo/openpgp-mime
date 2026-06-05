@@ -1,4 +1,6 @@
+import PostalMime, { RawEmail } from "postal-mime";
 import { MimeNode } from "./mimeNodeMixin.js";
+import { OpenPGPEmail } from "./OpenPGPMime.js";
 
 export function printMimeTree (root: MimeNode, sp = "") {
     console.log(sp + root.contentType.parsed?.value + " - \"" + new TextDecoder().decode(root.content?.slice(0, 60)).replaceAll("\n", "").replaceAll("\r", "") + "\"")
@@ -39,4 +41,28 @@ function isPgpArmored (content: Uint8Array, begin: Uint8Array, end: Uint8Array):
         }
     }
     return false;
+}
+
+export async function normalizeRawEmail (rawEmail: RawEmail): Promise<Uint8Array> {
+    if (typeof rawEmail.getReader === "function") {
+        return (new PostalMime()).resolveStream(rawEmail);
+    }
+
+    if (typeof rawEmail === "string") {
+        return new TextEncoder().encode(rawEmail);
+    }
+
+    if (rawEmail instanceof Blob || Object.prototype.toString.call(rawEmail) === '[object Blob]') {
+        return rawEmail.arrayBuffer();
+    }
+
+    if (rawEmail.buffer instanceof ArrayBuffer) {
+        return new Uint8Array(rawEmail).buffer;
+    }
+
+    if (rawEmail instanceof ArrayBuffer) {
+        return new Uint8Array(rawEmail);
+    }
+
+    return new Uint8Array();
 }
