@@ -8,6 +8,7 @@
 - TypeScript support
 - Comprehensive dependencies - only postal-mime and OpenPGP.js
 - Handles complex MIME structures combined with encryption and signing, including nested encryption/signatures and partially encrypted/signed messages
+- Can be used to sign/apply encryption to unsigned/unencrypted MIME messages
 
 ## Installation
 Available on NPM as `openpgp-mime`
@@ -122,11 +123,31 @@ const email = await OpenPGPMime.parse(eml, {
 
 When parsing arbitrary emails, wrap processing in a `try ... catch` block to catch parsing errors caused by incorrectly formatted emails
 
-## Parser Options
+Sign and encrypt an email
+```js
+import OpenPGPMime from "openpgp-mime";
+
+const eml = `Mime-Version: 1.0
+Content-Type: text/plain
+
+hello world`;
+const encryptedEml = await OpenPGPMime.apply(eml, {
+    encryptOptions: {
+        encryptionKeys: ...,
+        signingKeys: ...
+    }
+});
+```
+
+This assumes that the inputted email is valid. When processing arbitrary emails, validate the email first. This will also invalidate any ARC signatures on the message, they should be applied after signing/encrypting.
+
+## Options
 These are in addition to the [postal-mime options](https://www.npmjs.com/package/postal-mime#api). All options default to undefined/false.
 
 - `decryptOptions` - decryption options object to be passed to the call to `decrypt` in OpenPGP.js, mainly useful for setting `decryptionKeys` and `verificationKeys`
 - `verifyOptions` - verification options object to be passed to the call to `verify` in OpenPGP.js, mainly useful for setting `verificationKeys`
+- `encryptOptions` - encryption options to be passed to the call to `encrypt` in OpenPGP.js, mainly useful for setting `encryptionKeys` and `signingKeys`
+- `signOptions` - encryption options to be passed to the call to `sign` in OpenPGP.js, mainly useful for setting `signingKeys`
 - `keepPgpAttachments` - whether to preserve attachments containing PGP metadata (`application/pgp-encrypted` and `application/pgp-signature`)
 - `preventUnencapsulatedMessages` - whether to disallow PGP encrypted messages that are not wrapped in a `multipart/encrypted` MIME node
 - `inlineTextAsAttachments` - whether to return inline text nodes (`text/plain` or `text/html`) as attachments, allowing their individual signatures to be enumerated

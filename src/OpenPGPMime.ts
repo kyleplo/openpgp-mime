@@ -59,10 +59,12 @@ export class OpenPGPMime extends PostalMime {
         }
     }
 
+    /** Parse a raw MIME-formatted message */
     static async parse (rawEmail: RawEmail, options?: OpenPGPMimeOptions): Promise<OpenPGPEmail> {
         return (new OpenPGPMime(options)).parse(rawEmail);
     }
 
+    /** Parse a raw MIME-formatted message */
     async parse (rawEmail: RawEmail): Promise<OpenPGPEmail> {
         const email: OpenPGPEmail = await super.parse(rawEmail);
         email.signatures = this.signatures;
@@ -122,10 +124,12 @@ export class OpenPGPMime extends PostalMime {
         return super.isInlineTextNode(node);
     }
 
+    /** Apply encryption/signing to a MIME-formatted message */
     static async apply (rawEmail: RawEmail, options?: OpenPGPMimeOptions): Promise<string> {
         return (new OpenPGPMime(options)).apply(rawEmail);
     }
 
+    /** Apply encryption/signing to a MIME-formatted message */
     async apply (rawEmail: RawEmail): Promise<string> {
         const rawEmailBuffer = await normalizeRawEmail(rawEmail);
         const decodedRawEmail = typeof rawEmail === "string" ? rawEmail : new TextDecoder().decode(rawEmailBuffer)
