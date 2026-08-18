@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "openpgp": "^6.3.0",
-    "postal-mime": "^2.7.4"
+    "postal-mime": "^3.0.0"
   },
   "devDependencies": {
     "@types/libqp": "^1.1.3",
